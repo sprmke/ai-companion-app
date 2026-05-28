@@ -1,16 +1,14 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useState } from 'react';
 
 import Image from 'next/image';
 
 import axios from 'axios';
 
-import { api } from '@/convex/_generated/api';
-import { useMutation } from 'convex/react';
-
-import { WalletCardsIcon } from 'lucide-react';
-import { Loader2Icon } from 'lucide-react';
+import { Crown, LogOut, WalletCardsIcon } from 'lucide-react';
 
 import { toast } from 'sonner';
+import { useUpgradeCheckout } from '@/hooks/use-upgrade-checkout';
+import { useTokenUsage } from '@/hooks/use-token-usage';
 
 import {
   Dialog,
@@ -34,9 +32,8 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
 import { AuthContext } from '@/context/AuthContext';
-
-const PRO_PLAN_CREDITS = 10000;
-const FREE_PLAN_CREDITS = 5000;
+import { googleLogout } from '@react-oauth/google';
+import { useRouter } from 'next/navigation';
 
 function UserProfile({
   openUserProfile,
@@ -45,49 +42,19 @@ function UserProfile({
   openUserProfile: boolean;
   setOpenUserProfile: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const { user, setUser } = useContext(AuthContext);
+  const { used, maxTokens, usagePercent, planLabel, isPro } = useTokenUsage();
 
-  const userCredits = (user?.credits ?? 0) >= 0 ? (user?.credits ?? 0) : 0;
-
-  const updateUserTokens = useMutation(api.users.UpdateUserTokens);
-
-  const [userMaxToken, setUserMaxToken] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const { isLoading, startCheckout } = useUpgradeCheckout();
   const [isCanceling, setIsCanceling] = useState(false);
 
-  useEffect(() => {
-    setUserMaxToken(user?.orderId ? PRO_PLAN_CREDITS : FREE_PLAN_CREDITS);
-  }, [user?.orderId]);
-
-  const createCheckoutSession = async () => {
-    if (!user) return;
-
-    setIsLoading(true);
-    try {
-      // First, create or get customer
-      const customerResponse = await axios.post('/api/create-customer', {
-        email: user.email,
-        name: user.name,
-      });
-
-      const customerId = customerResponse.data.id;
-
-      // Create checkout session
-      const sessionResponse = await axios.post('/api/create-checkout-session', {
-        customerId,
-        priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID,
-        successUrl: `${window.location.origin}/workspace/success`,
-        cancelUrl: `${window.location.origin}/workspace`,
-      });
-
-      // Redirect to Stripe Checkout
-      window.location.href = sessionResponse.data.url;
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      toast.error('Failed to create checkout session');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleLogout = () => {
+    googleLogout();
+    setUser(null);
+    localStorage.removeItem('user_token');
+    setOpenUserProfile(false);
+    router.replace('/sign-in');
   };
 
   const cancelSubscription = async () => {
@@ -101,7 +68,6 @@ function UserProfile({
       });
 
       if (response.data.success) {
-        // Update local user state
         setUser({
           ...user,
           orderId: undefined,
@@ -124,99 +90,104 @@ function UserProfile({
 
   return (
     <Dialog open={openUserProfile} onOpenChange={setOpenUserProfile}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader className="hidden">
-          <DialogTitle></DialogTitle>
-          <DialogDescription></DialogDescription>
+          <DialogTitle>Profile</DialogTitle>
+          <DialogDescription>Account settings</DialogDescription>
         </DialogHeader>
-        <div className="mt-4">
-          <div className="flex gap-4 items-center">
+        <div>
+          <div className="flex items-center gap-4">
             <Image
               src={user?.picture ?? ''}
               alt="user"
-              width={60}
-              height={60}
-              className="w-[60px] h-[60px] rounded-full"
+              width={64}
+              height={64}
+              className="h-16 w-16 rounded-2xl ring-2 ring-primary/20"
             />
             <div>
-              <div className="font-bold text-lg">{user?.name}</div>
-              <div className="text-gray-500">{user?.email}</div>
+              <div className="text-lg font-bold">{user?.name}</div>
+              <div className="text-sm text-muted-foreground">{user?.email}</div>
             </div>
           </div>
 
-          <hr className="my-5"></hr>
+          <div className="my-6 h-px bg-border/60" />
 
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-2">
-              <p className="font-bold">Token Usage</p>
-              <p>
-                {userCredits}/{userMaxToken}
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Token Usage
               </p>
-              <Progress value={(userCredits / userMaxToken) * 100} />
+              <p className="mt-1 text-2xl font-bold tabular-nums">
+                {used.toLocaleString()}
+                <span className="text-base font-normal text-muted-foreground">
+                  {' '}
+                  / {maxTokens.toLocaleString()}
+                </span>
+              </p>
+              <Progress value={usagePercent} className="mt-3 h-2" />
             </div>
 
-            <div className="flex justify-between">
-              <p className="font-semibold text-lg">Current Plan</p>
-              <span className="p-1 bg-gray-100 rounded-md px-2 font-normal">
-                {!user?.orderId ? 'Free Plan' : 'Pro Plan'}
+            <div className="flex items-center justify-between rounded-2xl border border-border/50 bg-muted/30 p-4">
+              <div className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-chart-5" />
+                <p className="font-semibold">Current Plan</p>
+              </div>
+              <span className="rounded-xl bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
+                {planLabel}
               </span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 mt-3">
-            {!user?.orderId ? (
-              <div className="p-4 border rounded-xl mt-4">
-                <div className="flex justify-between">
+          <div className="mt-6">
+            {!isPro ? (
+              <div className="surface-card p-5">
+                <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-bold text-lg">Pro Plan</p>
-                    <p>10,000 Tokens</p>
+                    <p className="text-lg font-bold">Pro Plan</p>
+                    <p className="text-sm text-muted-foreground">
+                      10,000 tokens / month
+                    </p>
                   </div>
-                  <p className="font-bold text-lg flex items-center justify-center">
-                    $10/month
-                  </p>
+                  <p className="text-xl font-bold">$10/mo</p>
                 </div>
-                <hr className="my-3" />
                 <Button
-                  className="w-full"
-                  disabled={isLoading}
-                  onClick={createCheckoutSession}
+                  className="mt-4 w-full rounded-2xl shadow-soft"
+                  loading={isLoading}
+                  loadingText="Redirecting…"
+                  onClick={startCheckout}
                 >
-                  {isLoading ? (
-                    <Loader2Icon className="animate-spin" />
-                  ) : (
-                    <WalletCardsIcon />
-                  )}
-                  Upgrade Plan
+                  <WalletCardsIcon />
+                  Upgrade to Pro
                 </Button>
               </div>
             ) : (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
-                    className="mt-4 w-full"
+                    className="w-full rounded-2xl"
                     variant="secondary"
-                    disabled={isCanceling}
+                    loading={isCanceling}
+                    loadingText="Canceling…"
                   >
-                    {isCanceling ? (
-                      <Loader2Icon className="animate-spin" />
-                    ) : (
-                      'Cancel Subscription'
-                    )}
+                    Cancel Subscription
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="rounded-3xl">
                   <AlertDialogHeader>
                     <AlertDialogTitle>Cancel Subscription</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to cancel your subscription? You'll
-                      continue to have access to your Pro Plan features until
-                      the end of your current billing period. After that, you'll
-                      be downgraded to the Free Plan.
+                      Are you sure? You&apos;ll keep Pro access until the end of
+                      your billing period, then revert to the Free plan.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
-                    <AlertDialogAction onClick={cancelSubscription}>
+                    <AlertDialogCancel className="rounded-xl">
+                      Keep Subscription
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className="rounded-xl"
+                      onClick={cancelSubscription}
+                    >
                       Cancel Subscription
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -224,6 +195,15 @@ function UserProfile({
               </AlertDialog>
             )}
           </div>
+
+          <Button
+            variant="ghost"
+            className="mt-4 w-full rounded-2xl text-muted-foreground hover:text-foreground"
+            onClick={handleLogout}
+          >
+            <LogOut />
+            Log out
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

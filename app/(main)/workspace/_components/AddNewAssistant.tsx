@@ -3,25 +3,20 @@ import React, { useContext, useState } from 'react';
 import Image from 'next/image';
 
 import { toast } from 'sonner';
-import { Loader2Icon } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { ModelSelector } from '@/components/common/model-selector';
+import { PricingModal } from '@/components/common/pricing-modal';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -60,6 +55,7 @@ function AddNewAssistant({
   const addAssistants = useMutation(api.userAiAssistants.addAssistants);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [pricingOpen, setPricingOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssistant, setSelectedAssistant] =
     useState<AiAssistant>(DEFAULT_ASSISTANT);
@@ -105,149 +101,143 @@ function AddNewAssistant({
 
     setSelectedAssistant(DEFAULT_ASSISTANT);
     setIsLoading(false);
-    toast(`Successfully added ${name} as a new companion`);
+    toast.success(`Added ${name} as a new companion`);
     onAddAssistant();
   };
 
   return (
     <Dialog>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="mb-2">Add New Companion</DialogTitle>
-          <DialogDescription asChild>
-            <div className="grid grid-cols-3 gap-5 mt-5">
-              <div className="flex flex-col gap-2 border-r pr-5">
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => setSelectedAssistant(DEFAULT_ASSISTANT)}
-                >
-                  + Create custom companion
-                </Button>
-                <div className="flex flex-col gap-2">
-                  <Input
-                    placeholder="Search suggested companions"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-white"
-                  />
-                  <div className="flex flex-col max-h-[75vh] overflow-auto scrollbar-hide">
-                    {filteredAssistants.map((assistant, index) => (
-                      <div
-                        className="p-1.5 hover:bg-secondary flex gap-2 items-center rounded-lg cursor-pointer"
-                        key={index}
-                        onClick={() =>
-                          setSelectedAssistant(
-                            assistant as unknown as AiAssistant
-                          )
-                        }
-                      >
-                        <Image
-                          src={assistant.image}
-                          width={40}
-                          height={40}
-                          alt={assistant.name}
-                          className="w-[40px] h-[40px] object-cover rounded-lg"
-                        />
-                        <p className="text-sm">{assistant.title}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="col-span-2 flex flex-col gap-5">
-                <div className="flex gap-5">
-                  <AssistantAvatar
-                    onAvatarSelect={(image) =>
-                      onHandleInputChange('image', image)
+      <DialogContent className="max-w-4xl gap-0 p-0 sm:max-w-4xl">
+        <DialogHeader className="space-y-0 border-b border-border/40 px-6 py-5">
+          <DialogTitle>Add New Companion</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,240px)_1fr]">
+          <aside className="flex flex-col gap-4 border-border/40 px-5 py-5 md:border-r md:py-6">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 w-full rounded-xl"
+              onClick={() => setSelectedAssistant(DEFAULT_ASSISTANT)}
+            >
+              <Plus className="h-4 w-4" />
+              Create custom
+            </Button>
+            <Input
+              placeholder="Search suggested..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="flex max-h-[min(52vh,420px)] flex-col gap-1.5 overflow-y-auto pr-1 scrollbar-hide">
+              {filteredAssistants.map((assistant, index) => {
+                const isSelected = selectedAssistant?.title === assistant.title;
+                return (
+                  <button
+                    type="button"
+                    className={cn(
+                      'flex min-h-[52px] cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70',
+                      isSelected && 'bg-muted ring-1 ring-border/60'
+                    )}
+                    key={index}
+                    onClick={() =>
+                      setSelectedAssistant(assistant as unknown as AiAssistant)
                     }
                   >
                     <Image
-                      src={image}
-                      alt="assistant"
-                      width={85}
-                      height={85}
-                      className="w-[85px] h-[85px] rounded-lg cursor-pointer object-cover hover:opacity-80 transition-opacity duration-200"
+                      src={assistant.image}
+                      width={40}
+                      height={40}
+                      alt={assistant.name}
+                      className="h-10 w-10 shrink-0 rounded-xl object-cover ring-1 ring-border/40"
                     />
-                  </AssistantAvatar>
-                  <div className="flex flex-col gap-3 w-full">
-                    <Input
-                      placeholder="Name of Companion"
-                      className="w-full"
-                      value={selectedAssistant?.name}
-                      onChange={(event) =>
-                        onHandleInputChange('name', event.target.value)
-                      }
-                    />
-                    <Input
-                      placeholder="Title of Companion"
-                      value={selectedAssistant?.title}
-                      onChange={(event) =>
-                        onHandleInputChange('title', event.target.value)
-                      }
-                      className="w-full"
-                    />
-                  </div>
-                </div>
+                    <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
+                      {assistant.title}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
 
-                <div className="flex flex-col gap-1">
-                  <h2 className="text-gray-500">Model:</h2>
-                  <Select
-                    disabled
-                    value={aiModelId}
-                    onValueChange={(value) =>
-                      onHandleInputChange('aiModelId', value)
-                    }
-                  >
-                    <SelectTrigger className="w-full bg-white">
-                      <SelectValue placeholder="Select Model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {aiModelOptions.map(({ id, logo, name }, index) => (
-                        <SelectItem value={id} key={index}>
-                          <div className="flex gap-2 items-center m-1">
-                            <Image
-                              src={logo}
-                              alt={name}
-                              width={20}
-                              height={20}
-                              className="rounded-md"
-                            />
-                            <h2>{name}</h2>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex flex-col gap-1 flex-1">
-                  <h2 className="text-gray-500">Instructions:</h2>
-                  <Textarea
-                    disabled={!!id}
-                    placeholder="Add Instructions"
-                    value={userInstruction}
-                    className="min-h-[200px]"
-                    onChange={(event) =>
-                      onHandleInputChange('userInstruction', event.target.value)
-                    }
-                  />
-                </div>
-
-                <div className="flex gap-3 justify-end">
-                  <DialogClose asChild>
-                    <Button variant={'secondary'}>Cancel</Button>
-                  </DialogClose>
-                  <Button disabled={isLoading} onClick={addAssistant}>
-                    {isLoading && <Loader2Icon className="animate-spin" />} Add
-                  </Button>
-                </div>
+          <div className="flex flex-col gap-6 px-5 py-5 md:px-6 md:py-6">
+            <div className="flex gap-5 sm:gap-6">
+              <AssistantAvatar
+                selectedImage={image}
+                onAvatarSelect={(image) => onHandleInputChange('image', image)}
+              >
+                <Image
+                  src={image}
+                  alt="assistant"
+                  width={85}
+                  height={85}
+                  className="h-[85px] w-[85px] shrink-0 cursor-pointer rounded-2xl object-cover ring-2 ring-primary/15 transition-opacity hover:opacity-80"
+                />
+              </AssistantAvatar>
+              <div className="flex w-full min-w-0 flex-col gap-4">
+                <Input
+                  placeholder="Companion name"
+                  value={selectedAssistant?.name}
+                  onChange={(event) =>
+                    onHandleInputChange('name', event.target.value)
+                  }
+                />
+                <Input
+                  placeholder="Companion title"
+                  value={selectedAssistant?.title}
+                  onChange={(event) =>
+                    onHandleInputChange('title', event.target.value)
+                  }
+                />
               </div>
             </div>
-          </DialogDescription>
-        </DialogHeader>
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Model
+              </p>
+              <ModelSelector
+                value={aiModelId ?? aiModelOptions[0]?.id}
+                onValueChange={(value) =>
+                  onHandleInputChange('aiModelId', value)
+                }
+                onUpgradeClick={() => setPricingOpen(true)}
+              />
+              <PricingModal open={pricingOpen} onOpenChange={setPricingOpen} />
+            </div>
+
+            <div className="flex flex-1 flex-col space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Instructions
+              </p>
+              <Textarea
+                disabled={!!id}
+                placeholder="Add instructions for this companion..."
+                value={userInstruction}
+                className="min-h-[160px] resize-y"
+                onChange={(event) =>
+                  onHandleInputChange('userInstruction', event.target.value)
+                }
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-border/40 pt-5">
+              <DialogClose asChild>
+                <Button variant="secondary" className="min-w-[100px] rounded-xl">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                loading={isLoading}
+                loadingText="Adding…"
+                onClick={addAssistant}
+                className="min-w-[140px] rounded-xl shadow-soft"
+              >
+                Add Companion
+              </Button>
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

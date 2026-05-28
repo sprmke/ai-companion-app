@@ -4,20 +4,13 @@ import React, { Fragment, useContext, useEffect, useState } from 'react';
 
 import Image from 'next/image';
 
-import { Loader2, LogOut, UserCircle2 } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 
 import { BlurFade } from '@/components/magicui/blur-fade';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { UserAccountSummary } from '@/components/common/user-account-summary';
 
 import AddNewAssistant from '@/app/(main)/workspace/_components/AddNewAssistant';
 
@@ -30,49 +23,71 @@ import { AssistantContext } from '@/context/AssistantContext';
 import type { AiAssistants } from '@/app/(main)/types';
 
 import UserProfile from '@/app/(main)/workspace/_components/UserProfile';
-import { googleLogout } from '@react-oauth/google';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
-function AssistantList() {
+function AssistantList({
+  mobile = false,
+  collapsed = false,
+  onCompanionSelect,
+}: {
+  mobile?: boolean;
+  collapsed?: boolean;
+  onCompanionSelect?: () => void;
+}) {
   const convex = useConvex();
   const router = useRouter();
 
-  const { user, setUser } = useContext(AuthContext);
-  const { assistant, setAssistant } = useContext(AssistantContext);
+  const { user } = useContext(AuthContext);
+  const { assistant, setAssistant, assistantsRefreshKey } =
+    useContext(AssistantContext);
 
   const [assistants, setAssistants] = useState<AiAssistants>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [openUserProfile, setOpenUserProfile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    if (!user?._id || assistant) return;
+    if (!user?._id || assistants.length > 0) return;
 
     getUserAssistants();
-  }, [user, assistant === null]);
+  }, [user?._id, assistants.length]);
 
-  const getUserAssistants = async () => {
+  useEffect(() => {
+    if (!user?._id || assistantsRefreshKey === 0) return;
+
+    getUserAssistants();
+  }, [assistantsRefreshKey, user?._id]);
+
+  const getUserAssistants = async ({ reselect = false } = {}) => {
     if (!user?._id) return;
-    setIsLoading(true);
-    setAssistants([]);
 
-    const assistants = await convex.query(
-      api.userAiAssistants.getAllUserAssistants,
-      {
-        userId: user._id,
+    try {
+      const loadedAssistants = await convex.query(
+        api.userAiAssistants.getAllUserAssistants,
+        {
+          userId: user._id,
+        }
+      );
+
+      if (!loadedAssistants.length) {
+        router.push('/assistants');
+        return;
       }
-    );
 
-    if (!assistants.length) {
-      router.push('/assistants');
-      return;
+      setAssistants(loadedAssistants);
+
+      if (reselect || !assistant) {
+        setAssistant(loadedAssistants[0]);
+        return;
+      }
+
+      const stillSelected = loadedAssistants.find(
+        (item) => item._id === assistant._id
+      );
+      setAssistant(stillSelected ?? loadedAssistants[0]);
+    } catch (error) {
+      console.error('Failed to load companions:', error);
     }
-
-    const [assistant] = assistants ?? [];
-
-    setAssistant(assistant);
-    setAssistants(assistants);
-    setIsLoading(false);
   };
 
   const filteredAssistants = assistants.filter(
@@ -81,105 +96,127 @@ function AssistantList() {
       assistant.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleLogout = () => {
-    // Revoke Google OAuth token
-    googleLogout();
-
-    // Clear user from context
-    setUser(null);
-
-    // Redirect to sign-in page
-    router.replace('/sign-in');
-  };
-
   return (
-    <div className="flex flex-col p-5 bg-secondary border-r-[1px] h-[calc(100vh-64px)]">
+    <div
+      className={cn(
+        'flex h-full min-h-0 flex-col',
+        mobile ? 'gap-4 overflow-hidden bg-muted/30 p-5' : 'gap-3',
+        collapsed && !mobile && 'items-center'
+      )}
+    >
       <AddNewAssistant onAddAssistant={getUserAssistants}>
-        <Button className="w-full">+ Add New Companion</Button>
+        <Button
+          className={cn(
+            'rounded-2xl shadow-soft',
+            collapsed && !mobile
+              ? 'h-11 w-11 shrink-0 p-0'
+              : 'h-11 w-full'
+          )}
+          title="Add New Companion"
+        >
+          {collapsed && !mobile ? (
+            <Plus className="h-5 w-5" />
+          ) : (
+            '+ Add New Companion'
+          )}
+        </Button>
       </AddNewAssistant>
 
-      <Input
-        className="bg-white mt-3"
-        placeholder="Search assistant"
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-      />
+      {!collapsed || mobile ? (
+        <div className="relative shrink-0">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-10"
+            placeholder="Search companions..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      ) : null}
 
-      <div className="my-3 overflow-y-auto scrollbar-hide flex-1">
-        {isLoading ? (
-          <div className="flex justify-center items-center h-full">
-            <Loader2 className="animate-spin opacity-25" />
-          </div>
-        ) : (
-          filteredAssistants.map((_assistant, index) => (
+      <div
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto scrollbar-hide',
+          collapsed && !mobile ? 'w-full space-y-1.5' : 'space-y-2 pr-0.5'
+        )}
+      >
+        {filteredAssistants.map((_assistant, index) => (
             <BlurFade key={index} delay={0.25 + index * 0.05} inView>
               <div
-                className={`p-2 flex gap-3 items-center hover:bg-gray-200 hover:dark:bg-slate-700 rounded-xl cursor-pointer mt-2 ${_assistant.id == assistant?.id && 'bg-gray-200'}`}
+                role="button"
+                tabIndex={0}
+                title={
+                  collapsed && !mobile
+                    ? `${_assistant.name} — ${_assistant.title}`
+                    : undefined
+                }
+                className={cn(
+                  'flex cursor-pointer items-center rounded-2xl border border-transparent transition-all duration-200 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  collapsed && !mobile
+                    ? 'mx-auto min-h-0 w-11 justify-center p-0.5'
+                    : 'min-h-[68px] gap-3.5 px-3 py-3',
+                  _assistant.id === assistant?.id &&
+                    (collapsed && !mobile
+                      ? 'nav-item-active rounded-xl p-1'
+                      : 'nav-item-active')
+                )}
                 onClick={() => {
                   setAssistant(_assistant);
+                  onCompanionSelect?.();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setAssistant(_assistant);
+                    onCompanionSelect?.();
+                  }
                 }}
               >
                 <Image
                   src={_assistant.image}
                   alt={_assistant.name}
-                  width={60}
-                  height={60}
-                  className="rounded-xl w-[60px] h-[60px] object-cover"
+                  width={48}
+                  height={48}
+                  className={cn(
+                    'shrink-0 rounded-xl object-cover ring-2',
+                    collapsed && !mobile ? 'h-10 w-10' : 'h-12 w-12',
+                    _assistant.id === assistant?.id
+                      ? 'ring-primary/35'
+                      : 'ring-border/40'
+                  )}
                 />
-                <div>
-                  <h2 className="font-bold">{_assistant.name}</h2>
-                  <h2 className="text-gray-600 text-sm dark:text-gray-300">
-                    {_assistant.title}
-                  </h2>
-                </div>
+                {(!collapsed || mobile) && (
+                  <div className="min-w-0 flex-1 space-y-0.5 py-0.5">
+                    <h2
+                      className={cn(
+                        'truncate text-[15px] font-bold leading-tight',
+                        _assistant.id === assistant?.id && 'text-primary'
+                      )}
+                    >
+                      {_assistant.name}
+                    </h2>
+                    <p
+                      className={cn(
+                        'truncate text-sm leading-snug',
+                        _assistant.id === assistant?.id
+                          ? 'text-primary/70'
+                          : 'text-muted-foreground'
+                      )}
+                    >
+                      {_assistant.title}
+                    </p>
+                  </div>
+                )}
               </div>
             </BlurFade>
-          ))
-        )}
+          ))}
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <div className="flex gap-3 items-center hover:bg-gray-200 w-full p-2 rounded-xl cursor-pointer bg-secondary">
-            {user ? (
-              <Fragment>
-                <Image
-                  src={user?.picture}
-                  alt="user"
-                  width={35}
-                  height={35}
-                  className="rounded-full"
-                />
-                <div className="flex flex-col">
-                  <h2 className="font-bold">{user?.name}</h2>
-                  <h2 className="text-gray-400 text-sm">
-                    {user?.orderId ? 'Pro Plan' : 'Free Plan'}
-                  </h2>
-                </div>
-              </Fragment>
-            ) : (
-              <div className="flex justify-center items-center w-full min-h-[45px]">
-                <Loader2 className="animate-spin opacity-25" />
-              </div>
-            )}
-          </div>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-[200px]" align="start">
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={() => setOpenUserProfile(true)}
-          >
-            <UserCircle2 />
-            Profile
-          </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
-            <LogOut />
-            Logout
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <UserAccountSummary
+        collapsed={collapsed && !mobile}
+        user={user}
+        onClick={() => setOpenUserProfile(true)}
+      />
       <UserProfile
         openUserProfile={openUserProfile}
         setOpenUserProfile={setOpenUserProfile}

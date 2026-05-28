@@ -1,8 +1,9 @@
 import Image from 'next/image';
 
-import { Loader2Icon } from 'lucide-react';
-
 import Markdown from 'react-markdown';
+
+import { ChatTypingSkeleton } from '@/components/common/skeleton-loaders';
+import { cn } from '@/lib/utils';
 
 type ChatMessageProps = {
   role: 'user' | 'assistant';
@@ -17,29 +18,37 @@ function ChatMessage({
   assistantImage,
   isLoading,
 }: ChatMessageProps) {
+  const isUser = role === 'user';
+
+  if (isLoading && !isUser) {
+    return <ChatTypingSkeleton assistantImage={assistantImage} />;
+  }
+
   return (
     <div
-      className={`flex mb-2 ${role === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={cn('mb-4 flex', isUser ? 'justify-end' : 'justify-start')}
     >
-      <div className="flex gap-3">
-        {role === 'assistant' && assistantImage && (
+      <div className={cn('flex max-w-[85%] gap-3', isUser && 'flex-row-reverse')}>
+        {!isUser && assistantImage && (
           <Image
             src={assistantImage}
             alt="Assistant"
-            width={100}
-            height={100}
-            className="w-[50px] h-[50px] rounded-full object-cover"
+            width={44}
+            height={44}
+            className="h-11 w-11 shrink-0 rounded-xl object-cover ring-2 ring-primary/15"
           />
         )}
         <div
-          className={`flex items-start justify-start gap-2 p-3 text-black rounded-lg ${
-            role === 'user' ? 'bg-gray-200' : 'bg-gray-50'
-          } ${isLoading ? 'flex-row' : 'flex-col'}`}
-        >
-          {isLoading && (
-            <Loader2Icon className="w-4 h-4 animate-spin relative top-1" />
+          className={cn(
+            'rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm',
+            isUser
+              ? 'rounded-br-md bg-primary text-primary-foreground'
+              : 'rounded-bl-md border border-border/40 bg-muted/50 text-foreground'
           )}
-          <Markdown>{content}</Markdown>
+        >
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <Markdown>{content}</Markdown>
+          </div>
         </div>
       </div>
     </div>
