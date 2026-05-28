@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Play, XIcon } from 'lucide-react';
 
@@ -16,13 +17,22 @@ type AnimationStyle =
   | 'top-in-bottom-out'
   | 'left-in-right-out';
 
-interface HeroVideoProps {
+type HeroVideoProps = {
   animationStyle?: AnimationStyle;
   videoSrc: string;
-  thumbnailSrc: string;
-  thumbnailAlt?: string;
   className?: string;
-}
+} & (
+  | {
+      thumbnail: ReactNode;
+      thumbnailSrc?: never;
+      thumbnailAlt?: never;
+    }
+  | {
+      thumbnail?: never;
+      thumbnailSrc: string;
+      thumbnailAlt?: string;
+    }
+);
 
 const animationVariants = {
   'from-bottom': {
@@ -67,74 +77,156 @@ const animationVariants = {
   },
 };
 
+function getYoutubeEmbedUrl(videoSrc: string, autoplay: boolean) {
+  const idMatch = videoSrc.match(
+    /(?:embed\/|v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+  const videoId = idMatch?.[1];
+
+  if (!videoId) {
+    const separator = videoSrc.includes('?') ? '&' : '?';
+    return autoplay ? `${videoSrc}${separator}autoplay=1` : videoSrc;
+  }
+
+  const params = new URLSearchParams({
+    autoplay: autoplay ? '1' : '0',
+    rel: '0',
+    modestbranding: '1',
+    playsinline: '1',
+  });
+
+  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+}
+
 export default function HeroVideoDialog({
   animationStyle = 'from-center',
   videoSrc,
+  className,
+  thumbnail,
   thumbnailSrc,
   thumbnailAlt = 'Video thumbnail',
-  className,
 }: HeroVideoProps) {
   const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const selectedAnimation = animationVariants[animationStyle];
 
-  return (
-    <div className={cn('relative', className)}>
-      <div
-        className="group relative cursor-pointer"
-        onClick={() => setIsVideoOpen(true)}
-      >
-        <img
-          src={thumbnailSrc}
-          alt={thumbnailAlt}
-          width={1920}
-          height={1080}
-          className="w-full rounded-md border shadow-lg transition-all duration-200 ease-out group-hover:brightness-[0.8]"
-        />
-        <div className="absolute inset-0 flex scale-[0.9] items-center justify-center rounded-2xl transition-all duration-200 ease-out group-hover:scale-100">
-          <div className="flex size-28 items-center justify-center rounded-full bg-primary/10 backdrop-blur-md">
-            <div
-              className={`relative flex size-20 scale-100 items-center justify-center rounded-full bg-gradient-to-b from-primary/30 to-primary shadow-md transition-all duration-200 ease-out group-hover:scale-[1.2]`}
-            >
-              <Play
-                className="size-8 scale-100 fill-white text-white transition-transform duration-200 ease-out group-hover:scale-105"
-                style={{
-                  filter:
-                    'drop-shadow(0 4px 3px rgb(0 0 0 / 0.07)) drop-shadow(0 2px 2px rgb(0 0 0 / 0.06))',
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isVideoOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsVideoOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isVideoOpen]);
+
+  const embedSrc = getYoutubeEmbedUrl(videoSrc, isVideoOpen);
+
+  const modal =
+    mounted &&
+    createPortal(
       <AnimatePresence>
         {isVideoOpen && (
           <motion.div
+            key="hero-video-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Product demo video"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            onClick={() => setIsVideoOpen(false)}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md"
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsVideoOpen(false)}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm sm:p-6"
           >
             <motion.div
-              {...selectedAnimation}
+              initial={selectedAnimation.initial}
+              animate={selectedAnimation.animate}
+              exit={selectedAnimation.exit}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="relative mx-4 aspect-video w-full max-w-4xl md:mx-0"
+              className="relative aspect-video w-full max-w-4xl"
+              onClick={(e) => e.stopPropagation()}
             >
-              <motion.button className="absolute -top-16 right-0 rounded-full bg-neutral-900/50 p-2 text-xl text-white ring-1 backdrop-blur-md dark:bg-neutral-100/50 dark:text-black">
+              <button
+                type="button"
+                aria-label="Close video"
+                className="absolute -right-1 -top-12 z-10 rounded-2xl border border-border/50 bg-card/95 p-2.5 text-foreground shadow-elevated-lg backdrop-blur-md transition-colors hover:bg-muted sm:right-0"
+                onClick={() => setIsVideoOpen(false)}
+              >
                 <XIcon className="size-5" />
-              </motion.button>
-              <div className="relative isolate z-[1] size-full overflow-hidden rounded-2xl border-2 border-white">
+              </button>
+              <div className="relative size-full overflow-hidden rounded-3xl border border-border/50 bg-black shadow-elevated-lg">
                 <iframe
-                  src={videoSrc}
-                  className="size-full rounded-2xl"
+                  key={embedSrc}
+                  src={embedSrc}
+                  className="size-full"
                   allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                ></iframe>
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  title="Product demo video"
+                />
               </div>
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    );
+
+  return (
+    <div className={cn('relative', className)}>
+      <button
+        type="button"
+        className="group relative w-full cursor-pointer overflow-hidden rounded-3xl text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={() => setIsVideoOpen(true)}
+        aria-label="Play product demo video"
+      >
+        {thumbnail ? (
+          <div className="relative overflow-hidden rounded-3xl border border-border/50 shadow-elevated-lg">
+            {thumbnail}
+            <div className="pointer-events-none absolute inset-0 bg-foreground/20 transition-opacity group-hover:bg-foreground/30" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex items-center gap-2 rounded-full border border-white/20 bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft transition-transform group-hover:scale-105">
+                <Play className="h-4 w-4 fill-current" />
+                Watch demo
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <img
+              src={thumbnailSrc}
+              alt={thumbnailAlt}
+              width={1920}
+              height={1080}
+              className="aspect-video w-full rounded-3xl border border-border/50 object-cover shadow-elevated-lg transition-all duration-300 group-hover:brightness-90"
+            />
+            <div className="absolute inset-0 flex items-center justify-center rounded-3xl bg-gradient-to-t from-foreground/30 via-transparent to-transparent" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex size-24 items-center justify-center rounded-full border border-white/20 bg-background/20 backdrop-blur-md transition-transform duration-300 group-hover:scale-110">
+                <div className="flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-chart-4 shadow-soft">
+                  <Play className="ml-1 size-7 fill-primary-foreground text-primary-foreground" />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </button>
+
+      {modal}
     </div>
   );
 }

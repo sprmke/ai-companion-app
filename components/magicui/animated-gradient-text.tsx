@@ -1,37 +1,37 @@
 import { cn } from '@/lib/utils';
-import { ComponentPropsWithoutRef } from 'react';
+import { ComponentPropsWithoutRef, ReactNode } from 'react';
 
 export interface AnimatedGradientTextProps
   extends ComponentPropsWithoutRef<'div'> {
-  speed?: number;
-  colorFrom?: string;
-  colorTo?: string;
+  children: ReactNode;
 }
 
 export function AnimatedGradientText({
   children,
   className,
-  speed = 1,
-  colorFrom = '#ffaa40',
-  colorTo = '#9c40ff',
   ...props
 }: AnimatedGradientTextProps) {
   return (
-    <span
-      style={
-        {
-          '--bg-size': `${speed * 300}%`,
-          '--color-from': colorFrom,
-          '--color-to': colorTo,
-        } as React.CSSProperties
-      }
+    <div
       className={cn(
-        `inline animate-gradient bg-gradient-to-r from-[var(--color-from)] via-[var(--color-to)] to-[var(--color-from)] bg-[length:var(--bg-size)_100%] bg-clip-text text-transparent`,
+        'group relative mx-auto flex max-w-fit flex-row items-center justify-center rounded-2xl bg-muted/40 px-4 py-1.5 text-sm font-medium shadow-elevated backdrop-blur-sm transition-shadow hover:shadow-elevated-lg',
         className
       )}
       {...props}
     >
-      {children}
-    </span>
+      <span
+        className="absolute inset-0 block h-full w-full animate-gradient rounded-[inherit] bg-gradient-to-r from-[hsl(var(--color-1))]/40 via-[hsl(var(--color-4))]/40 to-[hsl(var(--color-2))]/40 bg-[length:300%_100%] p-[1px]"
+        style={{
+          WebkitMask:
+            'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+          WebkitMaskComposite: 'destination-out',
+          mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+          maskComposite: 'subtract',
+        }}
+      />
+      <span className="bg-gradient-to-r from-[hsl(var(--color-1))] via-[hsl(var(--color-4))] to-[hsl(var(--color-2))] bg-clip-text text-transparent">
+        {children}
+      </span>
+    </div>
   );
 }
