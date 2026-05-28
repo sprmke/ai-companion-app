@@ -2,34 +2,42 @@
 
 import { Fragment, useContext, useEffect, useState } from 'react';
 
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-
-import { Loader2Icon } from 'lucide-react';
 
 import { useConvex, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 
 import { BlurFade } from '@/components/magicui/blur-fade';
-import { RainbowButton } from '@/components/magicui/rainbow-button';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { AuthContext } from '@/context/AuthContext';
+import { AssistantContext } from '@/context/AssistantContext';
 
 import { aiAssistantsList } from '@/services/AiAssistantsList';
 import { AiAssistant, AiAssistants } from '@/app/(main)/types';
+import { cn } from '@/lib/utils';
+import { CompanionImage } from '@/components/common/companion-image';
+import { AssistantsPageSkeleton } from '@/components/common/skeleton-loaders';
+import { setAppHomeHrefCache } from '@/hooks/use-app-home';
+import { toast } from 'sonner';
 
-// Type for the static assistant list items
 type StaticAssistant = Omit<AiAssistant, '_id' | 'userId' | 'aiModelId'>;
 
 function AIAssistants() {
   const router = useRouter();
   const convex = useConvex();
   const { user } = useContext(AuthContext);
+  const { setAssistant } = useContext(AssistantContext);
+
+  useEffect(() => {
+    setAssistant(null);
+  }, [setAssistant]);
 
   const addAssistants = useMutation(api.userAiAssistants.addAssistants);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isContinueDisabled, setIsContinueDisabled] = useState(false);
   const [selectedAssistants, setSelectedAssistants] = useState<
     StaticAssistant[]
@@ -39,7 +47,6 @@ function AIAssistants() {
   >([]);
 
   useEffect(() => {
-    // Disable continue button if no assistants are selected and all assistants are available
     setIsContinueDisabled(
       !selectedAssistants.length &&
         availableAssistants.length === aiAssistantsList.length
@@ -55,7 +62,7 @@ function AIAssistants() {
   const getUserAssistants = async () => {
     if (!user?._id) return;
 
-    setIsLoading(true);
+    setIsPageLoading(true);
     const userAssistants = await convex.query(
       api.userAiAssistants.getAllUserAssistants,
       {
@@ -63,13 +70,17 @@ function AIAssistants() {
       }
     );
 
-    // Filter out assistants that user already has
     const filteredAssistants = aiAssistantsList.filter(
       (assistant) => !userAssistants.some(({ id }) => id === assistant.id)
     );
 
+    setAppHomeHrefCache(
+      user._id,
+      userAssistants.length > 0 ? '/workspace' : '/assistants'
+    );
+
     setAvailableAssistants(filteredAssistants);
-    setIsLoading(false);
+    setIsPageLoading(false);
   };
 
   const isAssistantSelected = (assistant: StaticAssistant) => {
@@ -90,97 +101,151 @@ function AIAssistants() {
   };
 
   const saveSelectedAssistants = async () => {
-    if (!user?._id) return;
-    setIsLoading(true);
-    await addAssistants({
-      aiAssistants: selectedAssistants.map((assistant) => ({
-        ...assistant,
-        userId: user._id,
-        aiModelId: 'google/gemini-2.0-flash',
-      })),
-    });
-    setIsLoading(false);
-    router.replace('/workspace');
+    if (!user?._id || isSaving) return;
+
+    setIsSaving(true);
+
+    try {
+      await addAssistants({
+        aiAssistants: selectedAssistants.map((assistant) => ({
+          ...assistant,
+          userId: user._id,
+          aiModelId: 'google/gemini-2.0-flash',
+        })),
+      });
+
+      const savedAssistants = await convex.query(
+        api.userAiAssistants.getAllUserAssistants,
+        { userId: user._id }
+      );
+
+      if (!savedAssistants.length) {
+        toast.error('Could not load your companions. Please try again.');
+        setIsSaving(false);
+        return;
+      }
+
+      setAppHomeHrefCache(user._id, '/workspace');
+      setAssistant(savedAssistants[0]);
+      router.replace('/workspace');
+    } catch (error) {
+      console.error('Failed to save companions:', error);
+      toast.error('Failed to save companions. Please try again.');
+      setIsSaving(false);
+    }
   };
 
-  return isLoading ? (
-    <div className="flex h-screen w-screen items-center justify-center">
-      <Loader2Icon className="animate-spin" size={35} />
-    </div>
-  ) : (
-    <div className="px-10 mt-[64px] md:px-28 lg:px-36 xl:px-48 py-10">
+  if (isPageLoading) {
+    return <AssistantsPageSkeleton />;
+  }
+
+  return (
+    <div className="app-shell relative top-[60px] min-h-[calc(100vh-60px)] py-10">
+      <div className="app-container">
       {availableAssistants.length === 0 ? (
-        <div className="flex flex-col items-center justify-center mt-20">
+        <div className="mt-20 flex flex-col items-center justify-center">
           <BlurFade delay={0.25} inView>
-            <h2 className="text-2xl font-bold text-center mb-6">
-              All suggested companions are already selected!
-            </h2>
-          </BlurFade>
-          <BlurFade delay={0.35} inView>
-            <RainbowButton onClick={() => router.replace('/workspace')}>
-              Go to workspace
-            </RainbowButton>
+            <div className="empty-state-well max-w-md">
+              <h2 className="text-2xl font-bold">
+                All suggested companions are already selected!
+              </h2>
+              <p className="mt-2 text-muted-foreground">
+                Head to your workspace to start chatting.
+              </p>
+              <Button
+                className="mt-6 rounded-2xl shadow-soft"
+                onClick={() => router.replace('/workspace')}
+              >
+                Go to workspace
+              </Button>
+            </div>
           </BlurFade>
         </div>
       ) : (
         <Fragment>
-          <div className="flex justify-between items-center">
-            <div>
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1">
               <BlurFade delay={0.25} inView>
-                <h2 className="text-3xl font-bold">
-                  Welcome to the space of AI Companions!
+                <p className="section-eyebrow">Onboarding</p>
+                <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">
+                  Choose your AI companions
                 </h2>
               </BlurFade>
               <BlurFade delay={0.25 * 2} inView>
-                <p className="text-xl mt-2">
-                  Choose your AI companion to help you with your tasks
+                <p className="mt-3 max-w-xl text-lg text-muted-foreground">
+                  Select one or more specialized assistants to join your
+                  workspace. You can always add more later.
                 </p>
               </BlurFade>
             </div>
-            <RainbowButton
-              disabled={isContinueDisabled}
+            <Button
+              size="lg"
+              disabled={isContinueDisabled || isSaving}
+              loading={isSaving}
+              loadingText="Saving…"
               onClick={saveSelectedAssistants}
+              className="w-full shrink-0 rounded-2xl shadow-soft sm:w-auto"
             >
-              {isLoading && !isContinueDisabled && (
-                <Loader2Icon className="animate-spin" />
-              )}{' '}
               Continue
-            </RainbowButton>
+            </Button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 mt-10">
-            {availableAssistants.map((assistant, index) => (
-              <BlurFade key={index} delay={0.25 + index * 0.05} inView>
-                <div
-                  className="hover:opacity-80 p-3 rounded-xl 
-                  transition-all ease-in-out cursor-pointer relative"
-                  onClick={() => selectAssistant(assistant)}
-                >
-                  <Checkbox
-                    className="absolute m-2"
-                    checked={isAssistantSelected(assistant)}
-                    variant="custom"
-                    customColor="#ef4138"
-                  />
-                  <Image
-                    src={assistant.image}
-                    alt={assistant.title}
-                    width={600}
-                    height={600}
-                    className="rounded-xl w-full h-[200px] object-cover"
-                  />
-                  <h2 className="text-center font-bold text-lg">
-                    {assistant.name}
-                  </h2>
-                  <h2 className="text-center text-gray-600 dark:text-gray-300">
-                    {assistant.title}
-                  </h2>
-                </div>
-              </BlurFade>
-            ))}
+          <div
+            className={cn(
+              'mt-12 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-5',
+              isSaving && 'pointer-events-none opacity-60'
+            )}
+          >
+            {availableAssistants.map((assistant, index) => {
+              const selected = isAssistantSelected(assistant);
+              return (
+                <BlurFade key={assistant.id} delay={0.25 + index * 0.05} inView>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                      'group relative w-full cursor-pointer overflow-hidden rounded-3xl border border-border/50 bg-card text-left shadow-elevated transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      selected && 'ring-2 ring-primary shadow-soft'
+                    )}
+                    onClick={() => selectAssistant(assistant)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectAssistant(assistant);
+                      }
+                    }}
+                  >
+                    <Checkbox
+                      className="absolute left-3 top-3 z-10"
+                      checked={selected}
+                      onCheckedChange={() => selectAssistant(assistant)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="relative h-[180px] overflow-hidden md:h-[200px]">
+                      <CompanionImage
+                        src={assistant.image}
+                        alt={assistant.name}
+                        priority={index < 5}
+                        className="transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-foreground/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <div className="p-4">
+                      <h2 className="text-center text-lg font-bold">
+                        {assistant.name}
+                      </h2>
+                      <p className="text-center text-sm text-muted-foreground">
+                        {assistant.title}
+                      </p>
+                    </div>
+                  </div>
+                </BlurFade>
+              );
+            })}
           </div>
         </Fragment>
       )}
+      </div>
     </div>
   );
 }

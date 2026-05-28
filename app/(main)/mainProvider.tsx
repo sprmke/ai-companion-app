@@ -2,11 +2,12 @@
 
 import React, { useContext, useEffect, useState } from 'react';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { GetAuthUserData } from '@/services/GlobalApi';
 
 import Header from '@/app/(main)/_components/Header';
+import { LoadingScreen, getRouteLoadingVariant } from '@/components/common/loading-screen';
 import { useConvex } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 
@@ -15,58 +16,89 @@ import { AssistantContext } from '@/context/AssistantContext';
 
 import type { AiAssistant } from '@/app/(main)/types';
 
+const PUBLIC_PATHS = ['/'];
+
 function Provider({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const router = useRouter();
+  const pathname = usePathname();
   const convex = useConvex();
-  const { setUser } = useContext(AuthContext);
+  const { setUser, setAuthReady } = useContext(AuthContext);
   const [assistant, setAssistant] = useState<AiAssistant | null>(null);
+  const [isWorkspaceLoading, setWorkspaceLoading] = useState(false);
+  const [assistantsRefreshKey, setAssistantsRefreshKey] = useState(0);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  const requestAssistantsRefresh = () => {
+    setAssistantsRefreshKey((key) => key + 1);
+  };
+
+  const isPublicRoute = PUBLIC_PATHS.includes(pathname);
 
   useEffect(() => {
+    setAuthChecked(false);
     CheckUseAuth();
-  }, []);
+  }, [pathname]);
 
   const CheckUseAuth = async () => {
-    // Get user token from local storage
+    const publicRoute = PUBLIC_PATHS.includes(pathname);
     const token = localStorage.getItem('user_token');
+    const authUser = token ? await GetAuthUserData(token) : null;
 
-    // Get new access token
-    const user = token ? await GetAuthUserData(token) : null;
-
-    // If user is not logged in, redirect to sign-in page
-    if (!user?.email) {
-      router.replace('/sign-in');
+    if (!authUser?.email) {
+      setUser(null);
+      setAuthChecked(true);
+      if (!publicRoute) {
+        router.replace('/sign-in');
+      }
       return;
     }
 
-    // Get User Info From Database
     try {
       const result = await convex.query(api.users.GetUser, {
-        email: user?.email,
+        email: authUser.email,
       });
 
       if (result) {
         setUser(result);
-      } else {
-        console.error('User not found in database');
+      } else if (!publicRoute) {
         router.replace('/sign-in');
       }
     } catch (error) {
       console.error('CheckUseAuth error::', error);
-      router.replace('/sign-in');
+      if (!publicRoute) {
+        router.replace('/sign-in');
+      }
+    } finally {
+      setAuthChecked(true);
+      setAuthReady(true);
     }
   };
 
+  const showAppHeader = !isPublicRoute && authChecked;
+  const showLoading = !isPublicRoute && !authChecked;
+
+  if (showLoading) {
+    return <LoadingScreen variant={getRouteLoadingVariant(pathname)} />;
+  }
+
   return (
-    <div>
-      <AssistantContext.Provider value={{ assistant, setAssistant }}>
-        <Header />
-        {children}
-      </AssistantContext.Provider>
-    </div>
+    <AssistantContext.Provider
+      value={{
+        assistant,
+        setAssistant,
+        isWorkspaceLoading,
+        setWorkspaceLoading,
+        assistantsRefreshKey,
+        requestAssistantsRefresh,
+      }}
+    >
+      {showAppHeader && <Header />}
+      {children}
+    </AssistantContext.Provider>
   );
 }
 
