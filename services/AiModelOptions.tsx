@@ -1,32 +1,44 @@
+export const DEFAULT_AI_MODEL_ID = 'google/gemini-2.0-flash';
+
+const DEPRECATED_MODEL_IDS: Record<string, string> = {
+  'anthropic/claude-3-5-haiku-latest': 'anthropic/claude-haiku-4-5',
+};
+
 export const aiModelOptions = [
   {
     name: 'Google: Gemini 2.0 Flash',
-    id: 'google/gemini-2.0-flash',
-    // model: 'google/gemini-2.0-flash-lite-001',//OpenRouter.ai
+    id: DEFAULT_AI_MODEL_ID,
     logo: '/google.png',
   },
   {
     name: 'OpenAI: GPT-4o-mini',
     id: 'openai/gpt-4o-mini',
-    // model: 'openai/gpt-4o-mini',//OpenRouter.ai
     logo: '/chatgpt.png',
   },
   {
     name: 'OpenAI: GPT-3.5 Turbo',
     id: 'openai/gpt-3.5-turbo',
-    // model: 'openai/gpt-3.5-turbo',//OpenRouter.ai
     logo: '/chatgpt.png',
   },
   {
-    name: 'Mistral: Saba',
+    name: 'Mistral: Pixtral Large',
     id: 'mistral/pixtral-large-latest',
-    // model: 'mistralai/mistral-saba',//OpenRouter.ai
     logo: '/Mistral.png',
   },
   {
-    name: 'anthropic',
-    id: 'anthropic/claude-3-5-haiku-latest',
-    // model: 'mistralai/mistral-saba',//OpenRouter.ai
+    name: 'Anthropic: Claude Haiku 4.5',
+    id: 'anthropic/claude-haiku-4-5',
     logo: '/anthropic.png',
   },
 ];
+
+export function resolveAiModelId(modelId?: string) {
+  if (!modelId) return DEFAULT_AI_MODEL_ID;
+
+  if (DEPRECATED_MODEL_IDS[modelId]) {
+    return DEPRECATED_MODEL_IDS[modelId];
+  }
+
+  const isKnown = aiModelOptions.some(({ id }) => id === modelId);
+  return isKnown ? modelId : DEFAULT_AI_MODEL_ID;
+}
