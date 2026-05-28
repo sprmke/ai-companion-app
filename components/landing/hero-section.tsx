@@ -4,22 +4,20 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import { AuthCtaButton } from '@/components/auth/auth-cta-button';
-import { HeroFloatingAccents } from './hero-floating-accents';
-import { WorkspacePreview } from './mockups/workspace-preview';
+import { HeroCompanionShowcase } from './hero-companion-showcase';
 import { ScrollReveal } from './scroll-reveal';
 
 export function HeroSection() {
-
   return (
     <section className="landing-hero relative overflow-x-hidden pt-28 pb-16 sm:pt-32 sm:pb-24 lg:pb-32">
       <div className="landing-mesh pointer-events-none absolute inset-0 -z-10" />
       <div className="landing-grid pointer-events-none absolute inset-0 -z-10 opacity-[0.35]" />
 
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          <div>
+        <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
+          <div className="text-center lg:text-left">
             <ScrollReveal>
-              <div className="landing-shimmer-badge mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/8 px-4 py-2 text-sm font-medium text-primary">
+              <div className="landing-shimmer-badge mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/8 px-4 py-2 text-sm font-medium text-primary lg:mx-0">
                 <Sparkles className="h-4 w-4" />
                 Personal + Customizable AI Companions
               </div>
@@ -28,13 +26,13 @@ export function HeroSection() {
             <ScrollReveal delay={100}>
               <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl xl:text-[3.5rem] xl:leading-[1.08]">
                 Your personal{' '}
-                <span className="landing-gradient-text">AI companions</span>{' '}
-                for every journey
+                <span className="landing-gradient-text">AI companions</span> for
+                every journey
               </h1>
             </ScrollReveal>
 
             <ScrollReveal delay={200}>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
+              <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground lg:mx-0">
                 Build a team of specialized AI assistants with unique
                 personalities, custom instructions, and a beautiful workspace
                 designed for deep focus.
@@ -42,7 +40,7 @@ export function HeroSection() {
             </ScrollReveal>
 
             <ScrollReveal delay={300}>
-              <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:items-center lg:justify-start">
                 <AuthCtaButton
                   guestLabel="Get Started Free"
                   authLabel="Continue to Workspace"
@@ -65,14 +63,17 @@ export function HeroSection() {
             </ScrollReveal>
           </div>
 
-          <ScrollReveal delay={200} direction="left" className="relative">
-            <div className="relative mx-auto w-full max-w-xl overflow-visible px-3 sm:px-5 lg:max-w-none">
-              <div className="landing-orb landing-orb-1" />
-              <div className="landing-orb landing-orb-2" />
+          <ScrollReveal
+            delay={200}
+            direction="left"
+            className="relative mx-auto w-full max-w-md sm:max-w-lg lg:mx-0 lg:max-w-none lg:pl-4 lg:pt-2"
+          >
+            <div className="relative mx-auto w-full overflow-visible lg:mx-0">
+              <div className="landing-orb landing-orb-1 opacity-80" />
+              <div className="landing-orb landing-orb-2 opacity-80" />
 
-              <div className="relative z-10 overflow-visible animate-float">
-                <WorkspacePreview />
-                <HeroFloatingAccents />
+              <div className="relative z-10 overflow-visible py-2">
+                <HeroCompanionShowcase />
               </div>
             </div>
           </ScrollReveal>

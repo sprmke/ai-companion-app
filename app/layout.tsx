@@ -23,13 +23,31 @@ export const metadata: Metadata = {
     'Build your team of AI companions. Custom personalities, multiple models, and a beautiful workspace for every task.',
 };
 
+const themeInitScript = `
+(function () {
+  try {
+    var theme = localStorage.getItem('theme');
+    if (theme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  } catch (e) {
+    document.documentElement.classList.add('dark');
+  }
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning={true}>
+    <html lang="en" className="dark" suppressHydrationWarning={true}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body
         className={`${plusJakarta.variable} ${geistMono.variable} font-sans antialiased`}
       >

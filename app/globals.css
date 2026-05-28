@@ -61,6 +61,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --shadow-elevated: 0 1px 2px hsl(0 0% 0% / 0.2),
       0 8px 24px -6px hsl(0 0% 0% / 0.35);
     --shadow-elevated-lg: 0 2px 4px hsl(0 0% 0% / 0.25),

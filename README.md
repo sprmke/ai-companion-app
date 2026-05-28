@@ -5,7 +5,7 @@
 Pick curated companions (fitness coach, code writer, tutor, and more) or create your own from scratch. Chat in a polished three-panel workspace, track token usage, and upgrade to Pro via Stripe. Built with **Next.js 15**, **Convex**, **Google sign-in**, and **Eden AI** for multi-model chat.
 
 <p align="center">
-  <img src="./docs/screenshots/landing-hero.png" alt="AI Companion marketing landing page" width="900" />
+  <img src="./docs/screenshots/preview.gif" alt="AI Companion — landing hero with companion carousel demo" width="900" />
 </p>
 
 <p align="center">
@@ -71,43 +71,43 @@ Pick curated companions (fitness coach, code writer, tutor, and more) or create 
 
 ## Screenshots
 
-| Landing | Companions onboarding |
-|:---:|:---:|
-| ![Landing page](./docs/screenshots/landing-hero.png) | ![Assistants onboarding](./docs/screenshots/assistants.png) |
+|                         Landing                          |                    Companions onboarding                    |
+| :------------------------------------------------------: | :---------------------------------------------------------: |
+| ![Landing page](./docs/screenshots/landing-page.png) | ![Assistants onboarding](./docs/screenshots/assistants.png) |
 
 ### Workspace
 
-| Empty chat state | Active conversation |
-|:---:|:---:|
+|                Empty chat state                |                      Active conversation                       |
+| :--------------------------------------------: | :------------------------------------------------------------: |
 | ![Workspace](./docs/screenshots/workspace.png) | ![Chat conversation](./docs/screenshots/chat-conversation.png) |
 
-| Chat with suggestions |
-|:---:|
+|        Chat with suggestions         |
+| :----------------------------------: |
 | ![Chat](./docs/screenshots/chat.png) |
 
 ### Modals
 
-| Add companion | Profile & billing | Upgrade to Pro |
-|:---:|:---:|:---:|
+|                       Add companion                        |                Profile & billing                 |                   Upgrade to Pro                   |
+| :--------------------------------------------------------: | :----------------------------------------------: | :------------------------------------------------: |
 | ![Add New Companion](./docs/screenshots/add-companion.png) | ![Profile modal](./docs/screenshots/profile.png) | ![Pro upgrade](./docs/screenshots/pricing-pro.png) |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|--------|------------|
-| Framework | [Next.js 15](https://nextjs.org/) (App Router) |
-| UI | [React 18](https://react.dev/), [Tailwind CSS 3](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/) (New York) |
-| Motion | [Motion](https://motion.dev/) (Framer Motion successor) + custom CSS animations |
-| Typography | [Plus Jakarta Sans](https://fonts.google.com/specimen/Plus+Jakarta+Sans) |
-| **Backend / DB** | [Convex](https://www.convex.dev/) (real-time queries & mutations) |
-| **Authentication** | [Google OAuth](https://developers.google.com/identity) (`@react-oauth/google`) |
-| **AI** | [Eden AI](https://www.edenai.co/) unified API |
-| **Payments** | [Stripe](https://stripe.com/) Checkout + webhooks |
-| **Hosting** | [Vercel](https://vercel.com/) (recommended) |
-| Toasts | [Sonner](https://sonner.emilkowal.ski/) |
-| Markdown | `react-markdown` |
+| Layer              | Technology                                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Framework          | [Next.js 15](https://nextjs.org/) (App Router)                                                                             |
+| UI                 | [React 18](https://react.dev/), [Tailwind CSS 3](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/) (New York) |
+| Motion             | [Motion](https://motion.dev/) (Framer Motion successor) + custom CSS animations                                            |
+| Typography         | [Plus Jakarta Sans](https://fonts.google.com/specimen/Plus+Jakarta+Sans)                                                   |
+| **Backend / DB**   | [Convex](https://www.convex.dev/) (real-time queries & mutations)                                                          |
+| **Authentication** | [Google OAuth](https://developers.google.com/identity) (`@react-oauth/google`)                                             |
+| **AI**             | [Eden AI](https://www.edenai.co/) unified API                                                                              |
+| **Payments**       | [Stripe](https://stripe.com/) Checkout + webhooks                                                                          |
+| **Hosting**        | [Vercel](https://vercel.com/) (recommended)                                                                                |
+| Toasts             | [Sonner](https://sonner.emilkowal.ski/)                                                                                    |
+| Markdown           | `react-markdown`                                                                                                           |
 
 ---
 
@@ -137,14 +137,14 @@ cp env.example .env.local
 
 Fill in:
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_CONVEX_URL` | Convex deployment URL from the dashboard |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google OAuth client ID (Web) |
-| `EDEN_AI_API_KEY` | Eden AI bearer token for chat API |
-| `STRIPE_SECRET_KEY` | Stripe secret key (server) |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `NEXT_PUBLIC_STRIPE_PRICE_ID` | Stripe Price ID for the Pro plan |
+| Variable                       | Description                              |
+| ------------------------------ | ---------------------------------------- |
+| `NEXT_PUBLIC_CONVEX_URL`       | Convex deployment URL from the dashboard |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google OAuth client ID (Web)             |
+| `EDEN_AI_API_KEY`              | Eden AI bearer token for chat API        |
+| `STRIPE_SECRET_KEY`            | Stripe secret key (server)               |
+| `STRIPE_WEBHOOK_SECRET`        | Stripe webhook signing secret            |
+| `NEXT_PUBLIC_STRIPE_PRICE_ID`  | Stripe Price ID for the Pro plan         |
 
 See [`env.example`](./env.example) for the full list.
 
@@ -180,24 +180,24 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-- **`/`** — public landing page  
-- **`/sign-in`** — Google sign-in  
-- **`/assistants`** — pick companions (after auth)  
-- **`/workspace`** — main chat dashboard  
+- **`/`** — public landing page
+- **`/sign-in`** — Google sign-in
+- **`/assistants`** — pick companions (after auth)
+- **`/workspace`** — main chat dashboard
 
 ---
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Next.js development server |
-| `npm run build` | Production build |
-| `npm run start` | Start production server |
-| `npm run lint` | ESLint |
-| `npm run lint:fix` | ESLint with auto-fix |
-| `npm run format` | Prettier write |
-| `npx convex dev` | Convex dev sync (run alongside Next.js) |
+| Command            | Description                             |
+| ------------------ | --------------------------------------- |
+| `npm run dev`      | Next.js development server              |
+| `npm run build`    | Production build                        |
+| `npm run start`    | Start production server                 |
+| `npm run lint`     | ESLint                                  |
+| `npm run lint:fix` | ESLint with auto-fix                    |
+| `npm run format`   | Prettier write                          |
+| `npx convex dev`   | Convex dev sync (run alongside Next.js) |
 
 ---
 
@@ -227,13 +227,13 @@ public/                    # Logo, avatars, model icons
 
 ## Routes
 
-| Route | Access | Description |
-|-------|--------|-------------|
-| `/` | Public | Marketing landing |
-| `/sign-in` | Public | Google OAuth |
-| `/assistants` | Auth | Select companions |
-| `/workspace` | Auth | Chat workspace |
-| `/workspace/success` | Auth | Post-checkout redirect |
+| Route                | Access | Description            |
+| -------------------- | ------ | ---------------------- |
+| `/`                  | Public | Marketing landing      |
+| `/sign-in`           | Public | Google OAuth           |
+| `/assistants`        | Auth   | Select companions      |
+| `/workspace`         | Auth   | Chat workspace         |
+| `/workspace/success` | Auth   | Post-checkout redirect |
 
 ---
 

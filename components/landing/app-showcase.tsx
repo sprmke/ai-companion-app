@@ -45,8 +45,8 @@ export function AppShowcase() {
             See AI Companion in action
           </h2>
           <p className="mt-5 text-lg text-muted-foreground">
-            Browse real app screens and see how your team of AI assistants
-            comes together in one beautiful workspace.
+            Browse real app screens and see how your team of AI assistants comes
+            together in one beautiful workspace.
           </p>
         </ScrollReveal>
 
