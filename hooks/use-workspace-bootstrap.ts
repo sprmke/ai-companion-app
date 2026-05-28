@@ -6,6 +6,7 @@ import { useConvex } from 'convex/react';
 import { useRouter } from 'next/navigation';
 
 import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 
 import { AuthContext } from '@/context/AuthContext';
 import { AssistantContext } from '@/context/AssistantContext';
@@ -19,28 +20,29 @@ export function useWorkspaceBootstrap() {
     useContext(AssistantContext);
 
   useEffect(() => {
-    if (!user?._id || assistant) return;
+    const userId = user?._id;
+    if (!userId || assistant) return;
 
     let cancelled = false;
 
-    async function bootstrap() {
+    async function bootstrap(resolvedUserId: Id<'users'>) {
       try {
         const loadedAssistants = await convex.query(
           api.userAiAssistants.getAllUserAssistants,
           {
-            userId: user._id,
+            userId: resolvedUserId,
           }
         );
 
         if (cancelled) return;
 
         if (!loadedAssistants.length) {
-          setAppHomeHrefCache(user._id, '/assistants');
+          setAppHomeHrefCache(resolvedUserId, '/assistants');
           router.replace('/assistants');
           return;
         }
 
-        setAppHomeHrefCache(user._id, '/workspace');
+        setAppHomeHrefCache(resolvedUserId, '/workspace');
         setWorkspaceLoading(true);
         setAssistant(loadedAssistants[0]);
       } catch (error) {
@@ -53,7 +55,7 @@ export function useWorkspaceBootstrap() {
       }
     }
 
-    bootstrap();
+    bootstrap(userId);
 
     return () => {
       cancelled = true;
