@@ -9,6 +9,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-plus-jakarta)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'ui-monospace', 'monospace'],
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
@@ -50,6 +54,18 @@ export default {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
         'color-1': 'hsl(var(--color-1))',
         'color-2': 'hsl(var(--color-2))',
         'color-3': 'hsl(var(--color-3))',
@@ -60,107 +76,34 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        xl: 'calc(var(--radius) + 4px)',
+        '2xl': 'calc(var(--radius) + 8px)',
+        '3xl': 'calc(var(--radius) + 16px)',
+      },
+      boxShadow: {
+        elevated: 'var(--shadow-elevated)',
+        'elevated-lg': 'var(--shadow-elevated-lg)',
+        soft: 'var(--shadow-soft)',
       },
       animation: {
         rainbow: 'rainbow var(--speed, 2s) infinite linear',
         shine: 'shine var(--duration) infinite linear',
         gradient: 'gradient 8s linear infinite',
         aurora: 'aurora 8s ease-in-out infinite alternate',
+        float: 'float 6s ease-in-out infinite',
       },
       keyframes: {
         rainbow: {
-          '0%': {
-            'background-position': '0%',
-          },
-          '100%': {
-            'background-position': '200%',
-          },
+          '0%': { 'background-position': '0%' },
+          '100%': { 'background-position': '200%' },
         },
         shine: {
-          '0%': {
-            'background-position': '0% 0%',
-          },
-          '50%': {
-            'background-position': '100% 100%',
-          },
-          to: {
-            'background-position': '0% 0%',
-          },
-        },
-        'aurora-border': {
-          '0%, 100%': {
-            borderRadius: '37% 29% 27% 27% / 28% 25% 41% 37%',
-          },
-          '25%': {
-            borderRadius: '47% 29% 39% 49% / 61% 19% 66% 26%',
-          },
-          '50%': {
-            borderRadius: '57% 23% 47% 72% / 63% 17% 66% 33%',
-          },
-          '75%': {
-            borderRadius: '28% 49% 29% 100% / 93% 20% 64% 25%',
-          },
-        },
-        'aurora-1': {
-          '0%, 100%': {
-            top: '0',
-            right: '0',
-          },
-          '50%': {
-            top: '50%',
-            right: '25%',
-          },
-          '75%': {
-            top: '25%',
-            right: '50%',
-          },
-        },
-        'aurora-2': {
-          '0%, 100%': {
-            top: '0',
-            left: '0',
-          },
-          '60%': {
-            top: '75%',
-            left: '25%',
-          },
-          '85%': {
-            top: '50%',
-            left: '50%',
-          },
-        },
-        'aurora-3': {
-          '0%, 100%': {
-            bottom: '0',
-            left: '0',
-          },
-          '40%': {
-            bottom: '50%',
-            left: '25%',
-          },
-          '65%': {
-            bottom: '25%',
-            left: '50%',
-          },
-        },
-        'aurora-4': {
-          '0%, 100%': {
-            bottom: '0',
-            right: '0',
-          },
-          '50%': {
-            bottom: '25%',
-            right: '40%',
-          },
-          '90%': {
-            bottom: '50%',
-            right: '25%',
-          },
+          '0%': { 'background-position': '0% 0%' },
+          '50%': { 'background-position': '100% 100%' },
+          to: { 'background-position': '0% 0%' },
         },
         gradient: {
-          to: {
-            backgroundPosition: 'var(--bg-size, 300%) 0',
-          },
+          to: { backgroundPosition: 'var(--bg-size, 300%) 0' },
         },
         aurora: {
           '0%': {
@@ -183,6 +126,10 @@ export default {
             backgroundPosition: '0% 50%',
             transform: 'rotate(-5deg) scale(0.9)',
           },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-8px)' },
         },
       },
     },

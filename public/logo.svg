@@ -1,24 +1,26 @@
 <svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0_1113_4451)">
-<path d="M136.36 200H63.6403C63.6191 183.147 56.9148 166.99 44.9977 155.073C33.0806 143.156 16.9236 136.451 0.0703125 136.43V63.71C75.2203 63.71 136.36 124.85 136.36 200Z" fill="url(#paint0_linear_1113_4451)"/>
-<path d="M199.931 63.71V136.43C183.077 136.451 166.92 143.156 155.003 155.073C143.086 166.99 136.382 183.147 136.361 200H63.6406C63.6406 124.85 124.781 63.71 199.931 63.71Z" fill="url(#paint1_linear_1113_4451)"/>
-<path d="M100 72C119.882 72 136 55.8823 136 36C136 16.1177 119.882 0 100 0C80.1177 0 64 16.1177 64 36C64 55.8823 80.1177 72 100 72Z" fill="url(#paint2_linear_1113_4451)"/>
-</g>
-<defs>
-<linearGradient id="paint0_linear_1113_4451" x1="82.3003" y1="153.85" x2="13.4603" y2="90.47" gradientUnits="userSpaceOnUse">
-<stop stop-color="#7928CA"/>
-<stop offset="1" stop-color="#ac5afe"/>
-</linearGradient>
-<linearGradient id="paint1_linear_1113_4451" x1="125.491" y1="181.32" x2="149.841" y2="94.37" gradientUnits="userSpaceOnUse">
-<stop stop-color="#0070F3"/>
-<stop offset="1" stop-color="#38bdf8"/>
-</linearGradient>
-<linearGradient id="paint2_linear_1113_4451" x1="70.96" y1="6.96" x2="125.51" y2="61.51" gradientUnits="userSpaceOnUse">
-<stop stop-color="#0070F3"/>
-<stop offset="1" stop-color="#38bdf8"/>
-</linearGradient>
-<clipPath id="clip0_1113_4451">
-<rect width="200" height="200" fill="white"/>
-</clipPath>
-</defs>
+  <defs>
+    <linearGradient id="logoGrad1" x1="40" y1="160" x2="160" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="0.5" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="logoGrad2" x1="100" y1="20" x2="180" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="200" height="200" rx="48" fill="url(#logoGrad1)" opacity="0.12"/>
+  <circle cx="100" cy="88" r="36" fill="url(#logoGrad2)" filter="url(#glow)"/>
+  <path d="M88 88 L96 96 L112 76" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M64 148 C64 124 80 108 100 108 C120 108 136 124 136 148" stroke="url(#logoGrad1)" stroke-width="10" stroke-linecap="round" fill="none"/>
+  <circle cx="72" cy="132" r="6" fill="#7C3AED" opacity="0.6"/>
+  <circle cx="128" cy="132" r="6" fill="#06B6D4" opacity="0.6"/>
 </svg>
