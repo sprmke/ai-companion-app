@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { resolveAiModelId } from '@/services/AiModelOptions';
 
+type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 type ChatMessage = {
   role: string;
-  content: string;
+  content: string | ContentPart[];
 };
 
-const EDEN_AI_CHAT_URL = 'https://api.edenai.run/v2/llm/chat';
+const EDEN_AI_CHAT_URL = 'https://api.edenai.run/v3/llm/chat/completions';
+
+export const runtime = 'nodejs';
 
 async function fetchEdenAiChat(body: string, headers: HeadersInit) {
   let lastError: unknown;
@@ -56,12 +62,24 @@ export async function POST(req: NextRequest) {
   const messages: ChatMessage[] = [];
 
   if (Array.isArray(clientMessages) && clientMessages.length > 0) {
-    for (const message of clientMessages) {
-      if (!message?.role || !message?.content?.trim()) continue;
-      messages.push({
-        role: message.role,
-        content: message.content.trim(),
-      });
+    for (const msg of clientMessages) {
+      if (!msg?.role) continue;
+
+      const text = typeof msg.content === 'string' ? msg.content.trim() : '';
+      const images: string[] = Array.isArray(msg.images) ? msg.images : [];
+
+      if (!text && images.length === 0) continue;
+
+      if (images.length > 0) {
+        const parts: ContentPart[] = [];
+        if (text) parts.push({ type: 'text', text });
+        for (const url of images) {
+          parts.push({ type: 'image_url', image_url: { url } });
+        }
+        messages.push({ role: msg.role, content: parts });
+      } else {
+        messages.push({ role: msg.role, content: text });
+      }
     }
   } else {
     if (systemInstruction?.trim()) {
@@ -96,42 +114,38 @@ export async function POST(req: NextRequest) {
   const body = JSON.stringify({
     model: resolveAiModelId(modelId),
     messages,
+    stream: true,
+    stream_options: { include_usage: true },
   });
 
   try {
     const response = await fetchEdenAiChat(body, headers);
-    const result = await response.json();
 
-    if (!response.ok) {
-      const providerMessage =
-        result?.error?.message ??
-        result?.detail ??
-        `API request failed with status ${response.status}`;
-
-      return NextResponse.json({ error: providerMessage }, { status: response.status });
-    }
-
-    if (result.status === 'fail' || result.error) {
-      const providerMessage =
-        result.error?.message ?? 'The selected AI model could not complete this request';
-
-      return NextResponse.json({ error: providerMessage }, { status: 502 });
-    }
-
-    if (!result.choices?.length) {
+    // On a non-streaming error, Eden AI returns a normal JSON error body.
+    if (!response.ok || !response.body) {
+      let providerMessage = `API request failed with status ${response.status}`;
+      try {
+        const result = await response.json();
+        providerMessage =
+          result?.error?.message ?? result?.detail ?? providerMessage;
+      } catch {
+        // Body wasn't JSON; keep the status-based message.
+      }
       return NextResponse.json(
-        { error: 'Invalid response from AI model' },
-        { status: 502 }
+        { error: providerMessage },
+        { status: response.status || 502 }
       );
     }
 
-    return NextResponse.json(
-      {
-        role: 'assistant',
-        content: result.choices[0].message.content,
+    // Pipe the upstream SSE stream straight through to the client.
+    return new Response(response.body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
       },
-      { status: 200 }
-    );
+    });
   } catch (error) {
     console.error('Error processing AI request:', error);
     return NextResponse.json(

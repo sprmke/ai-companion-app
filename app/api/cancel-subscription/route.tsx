@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { ConvexHttpClient } from 'convex/browser';
+
 import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
+import { resolveActiveSubscriptionId } from '@/lib/billing/resolve-subscription';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
@@ -11,29 +14,34 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export async function POST(req: NextRequest) {
   try {
-    const { subscriptionId, userId } = await req.json();
+    const { subscriptionId, stripeCustomerId, userId } = await req.json();
 
-    if (!subscriptionId) {
+    const resolvedId = await resolveActiveSubscriptionId(stripe, {
+      subscriptionId,
+      stripeCustomerId,
+    });
+
+    if (!resolvedId) {
       return NextResponse.json(
-        { error: 'Subscription ID is required' },
+        {
+          error:
+            'No active Stripe subscription found. Try refreshing your account or contact support.',
+        },
         { status: 400 }
       );
     }
 
-    // Cancel the subscription at period end
-    const subscription = await stripe.subscriptions.update(subscriptionId, {
+    const subscription = await stripe.subscriptions.update(resolvedId, {
       cancel_at_period_end: true,
     });
 
-    // Update user's orderId to null if userId is provided
     if (userId) {
       try {
         await convex.mutation(api.users.ClearUserOrderId, {
-          userId,
+          userId: userId as Id<'users'>,
         });
       } catch (convexError) {
         console.error('Error updating user orderId:', convexError);
-        // Don't fail the entire request if user update fails
       }
     }
 
@@ -44,9 +52,12 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Error canceling subscription:', error);
-    return NextResponse.json(
-      { error: 'Failed to cancel subscription' },
-      { status: 500 }
-    );
+
+    const message =
+      error instanceof Stripe.errors.StripeError
+        ? error.message
+        : 'Failed to cancel subscription';
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
