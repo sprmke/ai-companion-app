@@ -7,13 +7,11 @@ import { toast } from 'sonner';
 
 import { AuthContext } from '@/context/AuthContext';
 
-export function useUpgradeCheckout() {
+export function useTokenTopup() {
   const { user } = useContext(AuthContext);
   const [isLoading, setIsLoading] = useState(false);
 
-  const isPro = Boolean(user?.orderId);
-
-  const startCheckout = async () => {
+  const startTopup = async () => {
     if (!user) return;
 
     setIsLoading(true);
@@ -23,21 +21,21 @@ export function useUpgradeCheckout() {
         name: user.name,
       });
 
-      const sessionResponse = await axios.post('/api/create-checkout-session', {
+      const sessionResponse = await axios.post('/api/create-topup-checkout', {
         customerId: customerResponse.data.id,
-        priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID,
-        successUrl: `${window.location.origin}/workspace?payment=subscription`,
+        userId: user._id,
+        successUrl: `${window.location.origin}/workspace?payment=topup&session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${window.location.origin}/workspace`,
       });
 
       window.location.href = sessionResponse.data.url;
     } catch (error) {
-      console.error('Error creating checkout session:', error);
+      console.error('Error creating top-up checkout session:', error);
       toast.error('Failed to start checkout. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  return { isPro, isLoading, startCheckout };
+  return { isLoading, startTopup };
 }
