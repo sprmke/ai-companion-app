@@ -18,10 +18,11 @@ import { Button } from '@/components/ui/button';
 import { ModelSelector } from '@/components/common/model-selector';
 import { PricingModal } from '@/components/common/pricing-modal';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/common/rich-text-editor';
+import { isInstructionEmpty } from '@/lib/instruction-content';
 
 import { aiAssistantsList } from '@/services/AiAssistantsList';
-import { aiModelOptions } from '@/services/AiModelOptions';
+import { aiModelOptions, DEFAULT_AI_MODEL_ID } from '@/services/AiModelOptions';
 
 import AssistantAvatar from '@/app/(main)/workspace/_components/AssistantAvatar';
 
@@ -40,7 +41,7 @@ const DEFAULT_ASSISTANT = {
   id: '',
   sampleQuestions: [],
   userInstruction: '',
-  aiModelId: 'google/gemini-2.0-flash',
+  aiModelId: DEFAULT_AI_MODEL_ID,
 } as unknown as AiAssistant;
 
 function AddNewAssistant({
@@ -54,6 +55,7 @@ function AddNewAssistant({
 
   const addAssistants = useMutation(api.userAiAssistants.addAssistants);
 
+  const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [pricingOpen, setPricingOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,7 +67,7 @@ function AddNewAssistant({
     name,
     title,
     userInstruction,
-    aiModelId = 'google/gemini-2.0-flash',
+    aiModelId = DEFAULT_AI_MODEL_ID,
     image,
   } = selectedAssistant ?? {};
 
@@ -83,7 +85,12 @@ function AddNewAssistant({
   };
 
   const addAssistant = async () => {
-    if (!user?._id || !name || !title || !userInstruction) {
+    if (
+      !user?._id ||
+      !name ||
+      !title ||
+      isInstructionEmpty(userInstruction)
+    ) {
       return;
     }
 
@@ -94,19 +101,21 @@ function AddNewAssistant({
           ...selectedAssistant,
           id: crypto.randomUUID(),
           userId: user._id,
-          aiModelId: aiModelId ?? 'google/gemini-2.0-flash',
+          aiModelId: aiModelId ?? DEFAULT_AI_MODEL_ID,
         },
       ],
     });
 
     setSelectedAssistant(DEFAULT_ASSISTANT);
+    setSearchQuery('');
     setIsLoading(false);
+    setOpen(false);
     toast.success(`Added ${name} as a new companion`);
     onAddAssistant();
   };
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-4xl gap-0 p-0 sm:max-w-4xl">
         <DialogHeader className="space-y-0 border-b border-border/40 px-6 py-5">
@@ -210,13 +219,13 @@ function AddNewAssistant({
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Instructions
               </p>
-              <Textarea
+              <RichTextEditor
                 disabled={!!id}
-                placeholder="Add instructions for this companion..."
+                placeholder="Add instructions for this companion…"
+                minHeight="200px"
                 value={userInstruction}
-                className="min-h-[160px] resize-y"
-                onChange={(event) =>
-                  onHandleInputChange('userInstruction', event.target.value)
+                onChange={(html) =>
+                  onHandleInputChange('userInstruction', html)
                 }
               />
             </div>

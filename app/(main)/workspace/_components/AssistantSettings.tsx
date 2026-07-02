@@ -18,8 +18,10 @@ import { Save, SquarePen, Trash } from 'lucide-react';
 
 import { toast } from 'sonner';
 
-import { Textarea } from '@/components/ui/textarea';
 import { ModelSelector } from '@/components/common/model-selector';
+import { RichTextEditor } from '@/components/common/rich-text-editor';
+import { SampleQuestionsEditor } from '@/components/common/sample-questions-editor';
+import { SidebarQuickSuggestions } from '@/components/common/sidebar-quick-suggestions';
 import { PricingModal } from '@/components/common/pricing-modal';
 import { Button } from '@/components/ui/button';
 import { BlurFade } from '@/components/magicui/blur-fade';
@@ -27,19 +29,28 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 
-import { aiModelOptions } from '@/services/AiModelOptions';
+import { aiModelOptions, resolveAiModelId } from '@/services/AiModelOptions';
+import { useTokenUsage } from '@/hooks/use-token-usage';
 import { useUpgradeCheckout } from '@/hooks/use-upgrade-checkout';
 
 import { AuthContext } from '@/context/AuthContext';
 import { AssistantContext } from '@/context/AssistantContext';
+import { ThreadContext } from '@/context/ThreadContext';
 import { setAppHomeHrefCache } from '@/hooks/use-app-home';
 
 import type { AiAssistant } from '@/app/(main)/types';
 import AssistantConfirmationAlert from './AssistantConfirmationAlert';
+import {
+  instructionPreviewText,
+  isInstructionEmpty,
+} from '@/lib/instruction-content';
+import { isRadixPortaledTarget } from '@/lib/radix-portal';
+import { validateSampleQuestions } from '@/lib/sample-questions';
 import { cn } from '@/lib/utils';
 
 function AssistantSettings({
@@ -56,25 +67,44 @@ function AssistantSettings({
   const { user } = useContext(AuthContext);
   const { assistant, setAssistant, requestAssistantsRefresh } =
     useContext(AssistantContext);
+  const { setCurrentThreadId, startNewChatWithMessage } =
+    useContext(ThreadContext);
   const { isPro } = useUpgradeCheckout();
+  const { isMaxedOut } = useTokenUsage();
 
   const updateAssistant = useMutation(
     api.userAiAssistants.updateUserAiAssistant
   );
   const deleteAssistant = useMutation(api.userAiAssistants.deleteAssistant);
+  const deleteThreadsByAssistant = useMutation(
+    api.chatThreads.deleteThreadsByAssistant
+  );
 
-  const instructionsRef = useRef<HTMLTextAreaElement>(null);
   const [loading, setLoading] = useState(false);
   const [pricingOpen, setPricingOpen] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
-  const [pendingInstructionsFocus, setPendingInstructionsFocus] =
-    useState(false);
+  const [instructionsModalOpen, setInstructionsModalOpen] = useState(false);
+  const [focusInstructionsEditor, setFocusInstructionsEditor] = useState(false);
+  const [suggestionsSnapshot, setSuggestionsSnapshot] = useState<string[]>([]);
+  const instructionsSectionRef = useRef<HTMLElement>(null);
 
+  const resolvedModelId = resolveAiModelId(assistant?.aiModelId);
   const selectedModel =
-    aiModelOptions.find((model) => model.id === assistant?.aiModelId) ??
+    aiModelOptions.find((model) => model.id === resolvedModelId) ??
     aiModelOptions[0];
 
-  const onHandleInputChange = (field: keyof AiAssistant, value: string) => {
+  // Migrate deprecated model IDs stored in the DB (e.g. gemini-2.0 → 2.5).
+  useEffect(() => {
+    if (!assistant?.aiModelId) return;
+    const resolved = resolveAiModelId(assistant.aiModelId);
+    if (assistant.aiModelId === resolved) return;
+    setAssistant({ ...assistant, aiModelId: resolved });
+  }, [assistant, setAssistant]);
+
+  const onHandleInputChange = <K extends keyof AiAssistant>(
+    field: K,
+    value: AiAssistant[K]
+  ) => {
     setAssistant({ ...assistant, [field]: value } as AiAssistant);
   };
 
@@ -87,35 +117,54 @@ function AssistantSettings({
     setPricingOpen(true);
   };
 
-  const handleInstructionsClick = () => {
-    if (collapsed && !mobile) {
-      setPendingInstructionsFocus(true);
-      onExpandSidebar?.();
-      return;
+  const openInstructionsModal = (options?: { focusInstructions?: boolean }) => {
+    if (assistant) {
+      setSuggestionsSnapshot([...(assistant.sampleQuestions ?? [])]);
     }
-
-    instructionsRef.current?.focus();
+    setFocusInstructionsEditor(options?.focusInstructions ?? false);
+    setInstructionsModalOpen(true);
   };
 
   useEffect(() => {
-    if (!pendingInstructionsFocus || collapsed || mobile) return;
+    if (!instructionsModalOpen || !assistant) return;
+    setSuggestionsSnapshot([...(assistant.sampleQuestions ?? [])]);
+  }, [instructionsModalOpen, assistant?._id]);
+
+  useEffect(() => {
+    if (!instructionsModalOpen || !focusInstructionsEditor) return;
 
     const frame = requestAnimationFrame(() => {
-      instructionsRef.current?.focus();
-      setPendingInstructionsFocus(false);
+      instructionsSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [collapsed, mobile, pendingInstructionsFocus]);
+  }, [instructionsModalOpen, focusInstructionsEditor]);
 
-  const OnSave = async () => {
-    if (!assistant) return;
+  const handleInstructionsClick = () => {
+    openInstructionsModal({ focusInstructions: true });
+  };
+
+  const OnSave = async (): Promise<boolean> => {
+    if (!assistant) return false;
+
+    if (isInstructionEmpty(assistant.userInstruction)) {
+      toast.error('Instructions cannot be empty');
+      return false;
+    }
+
+    const questionsValidation = validateSampleQuestions(
+      assistant.sampleQuestions
+    );
+    if (!questionsValidation.valid) {
+      toast.error(questionsValidation.error ?? 'Invalid suggestions');
+      return false;
+    }
 
     const trimmedInstruction = assistant.userInstruction?.trim() ?? '';
-    if (!trimmedInstruction) {
-      toast.error('Instructions cannot be empty');
-      return;
-    }
+    const sampleQuestions = questionsValidation.normalized;
 
     setLoading(true);
 
@@ -124,17 +173,21 @@ function AssistantSettings({
         id: assistant._id,
         aiModelId: assistant.aiModelId,
         userInstruction: trimmedInstruction,
+        sampleQuestions,
       });
 
       setAssistant({
         ...assistant,
         userInstruction: trimmedInstruction,
+        sampleQuestions,
       });
 
       toast.success(`Updated ${assistant.name}'s settings`);
+      return true;
     } catch (error) {
       console.error('Failed to save companion settings:', error);
       toast.error('Failed to save settings. Please try again.');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -146,6 +199,12 @@ function AssistantSettings({
     setLoading(true);
 
     try {
+      await deleteThreadsByAssistant({
+        userId: user._id,
+        assistantId: assistant._id,
+      });
+      setCurrentThreadId(null);
+
       await deleteAssistant({
         id: assistant._id,
       });
@@ -252,24 +311,28 @@ function AssistantSettings({
             <Fragment>
               <div className="flex flex-col">
                 <BlurFade delay={0.25}>
-                  <div className="surface-muted mt-2 flex gap-4 p-4">
+                  <button
+                    type="button"
+                    onClick={openInstructionsModal}
+                    title="Edit companion"
+                    className="surface-muted mt-2 flex w-full cursor-pointer gap-3 rounded-2xl p-3.5 text-left transition-colors hover:ring-2 hover:ring-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
                     <Image
                       src={assistant.image}
-                      alt="assistant"
-                      width={80}
-                      height={80}
-                      className="h-20 w-20 rounded-2xl object-cover ring-2 ring-primary/15"
+                      alt={assistant.name}
+                      width={64}
+                      height={64}
+                      className="h-16 w-16 shrink-0 rounded-xl object-cover ring-2 ring-primary/15"
                     />
-                    <div>
-                      <p className="section-eyebrow text-[10px]">
-                        Active Companion
-                      </p>
-                      <h2 className="text-lg font-bold">{assistant.name}</h2>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0">
+                      <h2 className="text-base font-bold leading-tight">
+                        {assistant.name}
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
                         {assistant.title}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 </BlurFade>
                 <BlurFade delay={0.25 * 2}>
                   <div className="mt-6">
@@ -277,7 +340,8 @@ function AssistantSettings({
                       Model
                     </p>
                     <ModelSelector
-                      value={assistant.aiModelId ?? aiModelOptions[0]?.id}
+                      value={resolvedModelId}
+                      className="h-10 text-xs [&_img]:h-4 [&_img]:w-4"
                       onValueChange={(value) =>
                         onHandleInputChange('aiModelId', value)
                       }
@@ -290,14 +354,29 @@ function AssistantSettings({
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Instructions
                     </p>
-                    <Textarea
-                      ref={instructionsRef}
-                      placeholder="Add instructions for this companion..."
-                      className="min-h-[180px] resize-y"
-                      value={assistant.userInstruction ?? ''}
-                      onChange={(e) =>
-                        onHandleInputChange('userInstruction', e.target.value)
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openInstructionsModal({ focusInstructions: true })
                       }
+                      className="min-h-[100px] w-full cursor-pointer rounded-2xl border border-input bg-background/50 px-3 py-2 text-left text-xs leading-snug shadow-sm transition-colors hover:border-primary/30 hover:bg-background/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      {!isInstructionEmpty(assistant.userInstruction) ? (
+                        <span className="line-clamp-6 whitespace-pre-wrap text-foreground/90">
+                          {instructionPreviewText(
+                            assistant.userInstruction ?? ''
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/90">
+                          Add instructions for this companion…
+                        </span>
+                      )}
+                    </button>
+                    <SidebarQuickSuggestions
+                      questions={assistant.sampleQuestions}
+                      disabled={isMaxedOut}
+                      onSelect={startNewChatWithMessage}
                     />
                   </div>
                 </BlurFade>
@@ -327,7 +406,11 @@ function AssistantSettings({
         ) : null}
       </div>
 
-      <PricingModal open={pricingOpen} onOpenChange={setPricingOpen} />
+      <PricingModal
+        open={pricingOpen}
+        onOpenChange={setPricingOpen}
+        layer={instructionsModalOpen ? 'elevated' : 'default'}
+      />
 
       <Dialog open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
         <DialogContent className="max-w-md rounded-3xl">
@@ -339,13 +422,158 @@ function AssistantSettings({
           </DialogHeader>
           {assistant ? (
             <ModelSelector
-              value={assistant.aiModelId ?? aiModelOptions[0]?.id}
+              value={resolvedModelId}
               onValueChange={(value) => onHandleInputChange('aiModelId', value)}
               onUpgradeClick={() => {
                 setModelPickerOpen(false);
                 setPricingOpen(true);
               }}
             />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={instructionsModalOpen}
+        onOpenChange={(open) => {
+          setInstructionsModalOpen(open);
+          if (!open) setFocusInstructionsEditor(false);
+        }}
+      >
+        <DialogContent
+          className="!flex max-h-[90dvh] max-w-3xl flex-col gap-0 !overflow-hidden p-0 sm:max-w-3xl"
+          onPointerDownOutside={(event) => {
+            if (isRadixPortaledTarget(event.target)) {
+              event.preventDefault();
+            }
+          }}
+          onInteractOutside={(event) => {
+            if (isRadixPortaledTarget(event.target)) {
+              event.preventDefault();
+            }
+          }}
+        >
+          {assistant ? (
+            <>
+              <div className="shrink-0 border-b border-border/40 px-6 pb-4 pt-6">
+                <DialogHeader className="space-y-1 pr-8 text-left">
+                  <DialogTitle>Edit companion</DialogTitle>
+                  <DialogDescription>
+                    Customize model and instructions for {assistant.name}.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 scrollbar-hide">
+                <div className="space-y-8">
+                  <div className="surface-muted flex gap-4 p-4">
+                    <Image
+                      src={assistant.image}
+                      alt={assistant.name}
+                      width={80}
+                      height={80}
+                      className="h-20 w-20 shrink-0 rounded-2xl object-cover ring-2 ring-primary/15"
+                    />
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-bold">{assistant.name}</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {assistant.title}
+                      </p>
+                    </div>
+                  </div>
+
+                  <section className="space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Model
+                      </p>
+                    </div>
+                    <ModelSelector
+                      value={resolvedModelId}
+                      onValueChange={(value) =>
+                        onHandleInputChange('aiModelId', value)
+                      }
+                      onUpgradeClick={() => setPricingOpen(true)}
+                    />
+                  </section>
+
+                  <section
+                    ref={instructionsSectionRef}
+                    className="space-y-3 scroll-mt-4"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Instructions
+                      </p>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        How this companion should behave and respond.
+                      </p>
+                    </div>
+                    <RichTextEditor
+                      autoFocus={focusInstructionsEditor}
+                      placeholder="Add instructions for this companion…"
+                      minHeight="320px"
+                      value={assistant.userInstruction ?? ''}
+                      onChange={(html) =>
+                        onHandleInputChange('userInstruction', html)
+                      }
+                    />
+                  </section>
+
+                  <section className="space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Quick suggestions
+                      </p>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        Shown on the empty chat screen. Add 1–4 starter prompts.
+                      </p>
+                    </div>
+                    <SampleQuestionsEditor
+                      value={assistant.sampleQuestions ?? []}
+                      resetValue={suggestionsSnapshot}
+                      onChange={(questions) =>
+                        onHandleInputChange('sampleQuestions', questions)
+                      }
+                    />
+                  </section>
+                </div>
+              </div>
+
+              <DialogFooter className="shrink-0 gap-3 border-t border-border/40 bg-card px-6 py-4 sm:justify-between">
+                <AssistantConfirmationAlert OnDelete={OnDelete}>
+                  <Button
+                    disabled={loading}
+                    variant="ghost"
+                    className="rounded-xl"
+                  >
+                    <Trash /> Delete
+                  </Button>
+                </AssistantConfirmationAlert>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl"
+                    onClick={() => setInstructionsModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    loading={loading}
+                    loadingText="Saving"
+                    className="rounded-xl shadow-soft"
+                    onClick={async () => {
+                      const saved = await OnSave();
+                      if (saved) setInstructionsModalOpen(false);
+                    }}
+                  >
+                    <Save />
+                    Save
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
           ) : null}
         </DialogContent>
       </Dialog>

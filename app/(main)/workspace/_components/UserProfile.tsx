@@ -1,14 +1,16 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
 import axios from 'axios';
 
-import { Crown, LogOut, WalletCardsIcon } from 'lucide-react';
+import { Crown, WalletCardsIcon } from 'lucide-react';
 
 import { toast } from 'sonner';
 import { useUpgradeCheckout } from '@/hooks/use-upgrade-checkout';
-import { useTokenUsage } from '@/hooks/use-token-usage';
+import { useTokenTopup } from '@/hooks/use-token-topup';
+import { PRO_PLAN_TOKENS, useTokenUsage } from '@/hooks/use-token-usage';
+import { isStripeSubscriptionId } from '@/lib/billing/stripe';
 
 import {
   Dialog,
@@ -29,11 +31,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { TokenTopupSection } from '@/components/common/token-topup-section';
+import { TokenUsageMeter } from '@/components/common/token-usage-meter';
 
 import { AuthContext } from '@/context/AuthContext';
-import { googleLogout } from '@react-oauth/google';
-import { useRouter } from 'next/navigation';
 
 function UserProfile({
   openUserProfile,
@@ -42,28 +43,111 @@ function UserProfile({
   openUserProfile: boolean;
   setOpenUserProfile: (open: boolean) => void;
 }) {
-  const router = useRouter();
   const { user, setUser } = useContext(AuthContext);
-  const { used, maxTokens, usagePercent, planLabel, isPro } = useTokenUsage();
+  const {
+    used,
+    maxTokens,
+    usagePercent,
+    planLabel,
+    isPro,
+    isMaxedOut,
+    planAllowance,
+  } = useTokenUsage();
 
   const { isLoading, startCheckout } = useUpgradeCheckout();
+  const { isLoading: isTopupLoading, startTopup } = useTokenTopup();
   const [isCanceling, setIsCanceling] = useState(false);
+  const reconciledRef = useRef(false);
+  const subscriptionSyncedRef = useRef(false);
 
-  const handleLogout = () => {
-    googleLogout();
-    setUser(null);
-    localStorage.removeItem('user_token');
-    setOpenUserProfile(false);
-    router.replace('/sign-in');
-  };
+  const hasStripeSubscription = isStripeSubscriptionId(user?.orderId);
+
+  useEffect(() => {
+    if (!openUserProfile) {
+      subscriptionSyncedRef.current = false;
+    }
+  }, [openUserProfile]);
+
+  // Link a real Stripe subscription id when Pro but orderId is missing/invalid (e.g. manual_update)
+  useEffect(() => {
+    if (!openUserProfile || !isPro || !user?.stripeCustomerId) return;
+    if (hasStripeSubscription) return;
+    if (subscriptionSyncedRef.current) return;
+    subscriptionSyncedRef.current = true;
+
+    void fetch('/api/sync-subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user._id,
+        stripeCustomerId: user.stripeCustomerId,
+        orderId: user.orderId,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.orderId) return;
+        setUser((current) =>
+          current ? { ...current, orderId: data.orderId } : current
+        );
+      })
+      .catch(() => {});
+  }, [
+    openUserProfile,
+    isPro,
+    hasStripeSubscription,
+    user?._id,
+    user?.stripeCustomerId,
+    user?.orderId,
+    setUser,
+  ]);
+
+  useEffect(() => {
+    if (!openUserProfile || !isMaxedOut || !isPro || !user?.stripeCustomerId) {
+      return;
+    }
+    if (reconciledRef.current) return;
+    reconciledRef.current = true;
+
+    void fetch('/api/reconcile-topups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user._id,
+        stripeCustomerId: user.stripeCustomerId,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || data.applied === 0) return;
+        setUser((current) =>
+          current
+            ? {
+                ...current,
+                credits: data.credits,
+                topupCredits: data.topupCredits,
+              }
+            : current
+        );
+      })
+      .catch(() => {});
+  }, [openUserProfile, isMaxedOut, isPro, user, setUser]);
 
   const cancelSubscription = async () => {
     if (!user) return;
+
+    if (!user.stripeCustomerId && !hasStripeSubscription) {
+      toast.error(
+        'No billing account found. Try refreshing the page or contact support.'
+      );
+      return;
+    }
 
     setIsCanceling(true);
     try {
       const response = await axios.post('/api/cancel-subscription', {
         subscriptionId: user.orderId,
+        stripeCustomerId: user.stripeCustomerId,
         userId: user._id,
       });
 
@@ -82,7 +166,10 @@ function UserProfile({
       }
     } catch (error) {
       console.error('Error canceling subscription:', error);
-      toast.error('Failed to cancel subscription');
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error as string | undefined)
+        : undefined;
+      toast.error(message ?? 'Failed to cancel subscription');
     } finally {
       setIsCanceling(false);
     }
@@ -90,12 +177,13 @@ function UserProfile({
 
   return (
     <Dialog open={openUserProfile} onOpenChange={setOpenUserProfile}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[90dvh] max-w-md gap-0 overflow-y-auto overscroll-contain p-0 sm:max-w-md">
         <DialogHeader className="hidden">
           <DialogTitle>Profile</DialogTitle>
           <DialogDescription>Account settings</DialogDescription>
         </DialogHeader>
-        <div>
+
+        <div className="sticky top-0 z-10 border-b border-border/40 bg-card px-6 pb-4 pt-6 pr-12">
           <div className="flex items-center gap-4">
             <Image
               src={user?.picture ?? ''}
@@ -104,33 +192,39 @@ function UserProfile({
               height={64}
               className="h-16 w-16 rounded-2xl ring-2 ring-primary/20"
             />
-            <div>
-              <div className="text-lg font-bold">{user?.name}</div>
-              <div className="text-sm text-muted-foreground">{user?.email}</div>
+            <div className="min-w-0">
+              <div className="truncate text-lg font-bold">{user?.name}</div>
+              <div className="truncate text-sm text-muted-foreground">
+                {user?.email}
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="my-6 h-px bg-border/60" />
-
+        <div className="px-6 py-5">
           <div className="space-y-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Token Usage
-              </p>
-              <p className="mt-1 text-2xl font-bold tabular-nums">
-                {used.toLocaleString()}
-                <span className="text-base font-normal text-muted-foreground">
-                  {' '}
-                  / {maxTokens.toLocaleString()}
-                </span>
-              </p>
-              <Progress value={usagePercent} className="mt-3 h-2" />
-            </div>
+            <TokenUsageMeter
+              used={used}
+              maxTokens={maxTokens}
+              usagePercent={usagePercent}
+              isMaxedOut={isMaxedOut}
+              labelClassName="text-xs"
+              valueClassName="mt-1 text-2xl"
+              maxClassName="text-base"
+              barClassName="mt-3 h-2"
+            />
 
             <div className="flex items-center justify-between rounded-2xl border border-border/50 bg-muted/30 p-4">
               <div className="flex items-center gap-2">
                 <Crown className="h-5 w-5 text-chart-5" />
-                <p className="font-semibold">Current Plan</p>
+                <div>
+                  <p className="font-semibold">Current Plan</p>
+                  {isPro && (
+                    <p className="text-xs text-muted-foreground">
+                      Billed monthly · {PRO_PLAN_TOKENS.toLocaleString()} tokens
+                    </p>
+                  )}
+                </div>
               </div>
               <span className="rounded-xl bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
                 {planLabel}
@@ -138,14 +232,32 @@ function UserProfile({
             </div>
           </div>
 
-          <div className="mt-6">
-            {!isPro ? (
+          <div className="mt-6 space-y-4">
+            {isMaxedOut ? (
+              <TokenTopupSection
+                variant="urgent"
+                isPro={isPro}
+                planAllowance={planAllowance}
+                isLoading={isTopupLoading}
+                onTopup={startTopup}
+                onUpgrade={!isPro ? startCheckout : undefined}
+                isUpgradeLoading={isLoading}
+              />
+            ) : isPro ? (
+              <TokenTopupSection
+                variant="optional"
+                isPro={isPro}
+                planAllowance={planAllowance}
+                isLoading={isTopupLoading}
+                onTopup={startTopup}
+              />
+            ) : (
               <div className="surface-card p-5">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-lg font-bold">Pro Plan</p>
                     <p className="text-sm text-muted-foreground">
-                      10,000 tokens / month
+                      {PRO_PLAN_TOKENS.toLocaleString()} tokens / month
                     </p>
                   </div>
                   <p className="text-xl font-bold">$10/mo</p>
@@ -160,12 +272,14 @@ function UserProfile({
                   Upgrade to Pro
                 </Button>
               </div>
-            ) : (
+            )}
+
+            {isPro && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     className="w-full rounded-2xl"
-                    variant="secondary"
+                    variant={isMaxedOut ? 'ghost' : 'secondary'}
                     loading={isCanceling}
                     loadingText="Canceling…"
                   >
@@ -195,15 +309,6 @@ function UserProfile({
               </AlertDialog>
             )}
           </div>
-
-          <Button
-            variant="ghost"
-            className="mt-4 w-full rounded-2xl text-muted-foreground hover:text-foreground"
-            onClick={handleLogout}
-          >
-            <LogOut />
-            Log out
-          </Button>
         </div>
       </DialogContent>
     </Dialog>
