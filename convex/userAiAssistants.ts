@@ -36,15 +36,21 @@ export const updateUserAiAssistant = mutation({
     id: v.id('userAiAssistants'),
     userInstruction: v.string(),
     aiModelId: v.optional(v.string()),
+    sampleQuestions: v.optional(v.array(v.string())),
   },
-  handler: async ({ db }, { id, userInstruction, aiModelId }) => {
+  handler: async ({ db }, { id, userInstruction, aiModelId, sampleQuestions }) => {
     const patch: {
       userInstruction: string;
       aiModelId?: string;
+      sampleQuestions?: string[];
     } = { userInstruction };
 
     if (aiModelId !== undefined) {
       patch.aiModelId = aiModelId;
+    }
+
+    if (sampleQuestions !== undefined) {
+      patch.sampleQuestions = sampleQuestions;
     }
 
     await db.patch(id, patch);

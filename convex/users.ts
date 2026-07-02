@@ -68,12 +68,132 @@ export const UpdateUserTokens = mutation({
     orderId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const result = await ctx.db.patch(args.userId, {
+    await ctx.db.patch(args.userId, {
       credits: args.credits,
+      topupCredits: 0,
       ...(args.orderId && { orderId: args.orderId }),
     });
 
-    return result;
+    const sessions = await ctx.db
+      .query('stripeSessions')
+      .filter((q) => q.eq(q.field('userId'), args.userId))
+      .collect();
+
+    for (const session of sessions) {
+      await ctx.db.delete(session._id);
+    }
+
+    return args.userId;
+  },
+});
+
+export const DeductUserTokens = mutation({
+  args: {
+    userId: v.id('users'),
+    amount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const amount = Math.max(0, Math.ceil(args.amount));
+    if (amount === 0) {
+      return user.credits;
+    }
+
+    const credits = Math.max(0, user.credits - amount);
+    await ctx.db.patch(args.userId, { credits });
+
+    return credits;
+  },
+});
+
+export const AddUserTokens = mutation({
+  args: {
+    userId: v.id('users'),
+    amount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const amount = Math.max(0, Math.ceil(args.amount));
+    const credits = user.credits + amount;
+    await ctx.db.patch(args.userId, { credits });
+
+    return credits;
+  },
+});
+
+/** Idempotent token top-up — safe to call from webhook and success-page fallback. */
+export const ApplyTokenTopup = mutation({
+  args: {
+    userId: v.id('users'),
+    sessionId: v.string(),
+    amount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query('stripeSessions')
+      .withIndex('by_session', (q) => q.eq('sessionId', args.sessionId))
+      .first();
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (existing) {
+      const topupCredits = user.topupCredits ?? 0;
+      return { credits: user.credits, topupCredits, alreadyProcessed: true };
+    }
+
+    const amount = Math.max(0, Math.ceil(args.amount));
+    const credits = user.credits + amount;
+    const topupCredits = (user.topupCredits ?? 0) + amount;
+
+    await ctx.db.patch(args.userId, { credits, topupCredits });
+    await ctx.db.insert('stripeSessions', {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      type: 'token_topup',
+      amount,
+      processedAt: Date.now(),
+    });
+
+    return { credits, topupCredits, alreadyProcessed: false };
+  },
+});
+
+/** Backfill topupCredits from stripeSessions for users who topped up before the field existed. */
+export const EnsureTopupCreditsSynced = mutation({
+  args: {
+    userId: v.id('users'),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user || (user.topupCredits ?? 0) > 0) {
+      return user?.topupCredits ?? 0;
+    }
+
+    const sessions = await ctx.db
+      .query('stripeSessions')
+      .filter((q) => q.eq(q.field('userId'), args.userId))
+      .collect();
+
+    const total = sessions
+      .filter((s) => s.type === 'token_topup')
+      .reduce((sum, s) => sum + s.amount, 0);
+
+    if (total > 0) {
+      await ctx.db.patch(args.userId, { topupCredits: total });
+    }
+
+    return total;
   },
 });
 
@@ -101,5 +221,16 @@ export const ClearUserOrderId = mutation({
     });
 
     return result;
+  },
+});
+
+export const SetUserOrderId = mutation({
+  args: {
+    userId: v.id('users'),
+    orderId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, { orderId: args.orderId });
+    return args.orderId;
   },
 });

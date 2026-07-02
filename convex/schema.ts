@@ -13,6 +13,13 @@ export const aiAssistant = {
   userId: v.id('users'),
 };
 
+const chatMessage = {
+  role: v.union(v.literal('user'), v.literal('assistant')),
+  content: v.string(),
+  images: v.optional(v.array(v.string())),
+  createdAt: v.number(),
+};
+
 export default defineSchema({
   users: defineTable({
     name: v.string(),
@@ -21,6 +28,24 @@ export default defineSchema({
     credits: v.number(),
     orderId: v.optional(v.string()),
     stripeCustomerId: v.optional(v.string()),
+    /** One-time top-up tokens for the current billing period (resets on renewal). */
+    topupCredits: v.optional(v.number()),
   }),
   userAiAssistants: defineTable(aiAssistant),
+  chatThreads: defineTable({
+    userId: v.id('users'),
+    assistantId: v.id('userAiAssistants'),
+    title: v.string(),
+    messages: v.array(v.object(chatMessage)),
+    updatedAt: v.number(),
+  })
+    .index('by_user_assistant', ['userId', 'assistantId'])
+    .index('by_user', ['userId']),
+  stripeSessions: defineTable({
+    sessionId: v.string(),
+    userId: v.id('users'),
+    type: v.string(),
+    amount: v.number(),
+    processedAt: v.number(),
+  }).index('by_session', ['sessionId']),
 });
