@@ -1,12 +1,13 @@
-export const DEFAULT_AI_MODEL_ID = 'google/gemini-2.0-flash';
+export const DEFAULT_AI_MODEL_ID = 'google/gemini-2.5-flash';
 
 const DEPRECATED_MODEL_IDS: Record<string, string> = {
   'anthropic/claude-3-5-haiku-latest': 'anthropic/claude-haiku-4-5',
+  'google/gemini-2.0-flash': 'google/gemini-2.5-flash',
 };
 
 export const aiModelOptions = [
   {
-    name: 'Google: Gemini 2.0 Flash',
+    name: 'Google: Gemini 2.5 Flash',
     id: DEFAULT_AI_MODEL_ID,
     logo: '/google.png',
   },
