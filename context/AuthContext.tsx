@@ -1,10 +1,10 @@
-import { createContext } from 'react';
+import { createContext, Dispatch, SetStateAction } from 'react';
 
 import { User } from '@/app/(main)/types';
 
 type AuthContextType = {
   user: User | null;
-  setUser: (user: User | null) => void;
+  setUser: Dispatch<SetStateAction<User | null>>;
   isAuthReady: boolean;
   setAuthReady: (ready: boolean) => void;
 };
