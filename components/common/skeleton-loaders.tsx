@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 import { cn } from '@/lib/utils';
 import { workspaceSidebarWidths } from '@/app/(main)/workspace/_components/WorkspaceSidebar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -82,15 +84,9 @@ export function UserAccountSummarySkeleton({
 }) {
   if (collapsed) {
     return (
-      <div
-        className={cn(
-          'relative mx-auto h-11 w-11 shrink-0',
-          className
-        )}
-      >
-        <Skeleton className="h-9 w-9 rounded-full" />
-        <Skeleton className="absolute bottom-0.5 left-0.5 h-[18px] w-[18px] rounded-full" />
-      </div>
+      <Skeleton
+        className={cn('mx-auto h-11 w-11 shrink-0 rounded-xl', className)}
+      />
     );
   }
 
@@ -199,17 +195,130 @@ export function SettingsPanelSkeleton({ className }: { className?: string }) {
 
 export function ChatTypingSkeleton({ assistantImage }: { assistantImage?: string }) {
   return (
-    <div className="mb-4 flex justify-start">
-      <div className="flex max-w-[85%] gap-3">
+    <div className="mb-4 flex w-full min-w-0 justify-start">
+      <div className="flex w-full min-w-0 gap-3">
         {assistantImage ? (
           <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
         ) : null}
-        <div className="min-w-[12rem] space-y-2 rounded-2xl rounded-bl-md border border-border/40 bg-muted/50 px-4 py-3">
+        <div className="min-w-0 flex-1 space-y-2.5 rounded-2xl rounded-bl-md border border-border/40 bg-muted/50 px-4 py-4">
           <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-5/6" />
+          <Skeleton className="h-3 w-11/12" />
+          <Skeleton className="h-3 w-4/5" />
           <Skeleton className="h-3 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
         </div>
       </div>
+    </div>
+  );
+}
+
+export function ChatThinkingIndicator({
+  assistantImage,
+  label = 'Thinking',
+}: {
+  assistantImage?: string;
+  label?: string;
+}) {
+  return (
+    <div className="mb-4 flex w-full min-w-0 animate-in fade-in duration-300 justify-start">
+      <div className="flex min-w-0 gap-3">
+        {assistantImage ? (
+          <Image
+            src={assistantImage}
+            alt="Assistant"
+            width={44}
+            height={44}
+            className="h-11 w-11 shrink-0 rounded-xl object-cover ring-2 ring-primary/15"
+          />
+        ) : null}
+        <div className="flex items-center gap-2.5 rounded-2xl rounded-bl-md border border-border/40 bg-muted/50 px-4 py-3.5 shadow-sm">
+          <span className="bg-gradient-to-r from-muted-foreground via-foreground to-muted-foreground bg-[length:200%_100%] bg-clip-text text-sm font-medium text-transparent [animation:thinking-shimmer_2s_ease-in-out_infinite]">
+            {label}
+          </span>
+          <span className="flex items-center gap-1">
+            <span
+              className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/70"
+              style={{ animationDelay: '0ms', animationDuration: '1s' }}
+            />
+            <span
+              className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/70"
+              style={{ animationDelay: '150ms', animationDuration: '1s' }}
+            />
+            <span
+              className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/70"
+              style={{ animationDelay: '300ms', animationDuration: '1s' }}
+            />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatBubbleSkeleton({
+  align = 'left',
+  lineWidths,
+  withAvatar = true,
+}: {
+  align?: 'left' | 'right';
+  lineWidths: string[];
+  withAvatar?: boolean;
+}) {
+  const isUser = align === 'right';
+
+  return (
+    <div
+      className={cn(
+        'mb-4 flex w-full min-w-0',
+        isUser ? 'justify-end' : 'justify-start'
+      )}
+    >
+      {isUser ? (
+        <div className="min-w-0 max-w-[85%] space-y-2.5 rounded-2xl rounded-br-md bg-primary/10 px-4 py-3.5">
+          {lineWidths.map((width, i) => (
+            <Skeleton key={i} className="h-3" style={{ width }} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex w-full min-w-0 gap-3">
+          {withAvatar && (
+            <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+          )}
+          <div className="min-w-0 flex-1 space-y-2.5 rounded-2xl rounded-bl-md border border-border/40 bg-muted/50 px-4 py-3.5">
+            {lineWidths.map((width, i) => (
+              <Skeleton key={i} className="h-3" style={{ width }} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ConversationSkeleton({
+  className,
+}: {
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 scrollbar-hide sm:p-6',
+        className
+      )}
+      aria-busy="true"
+      aria-label="Loading conversation"
+    >
+      <ChatBubbleSkeleton align="right" lineWidths={['9rem', '5rem']} />
+      <ChatBubbleSkeleton
+        align="left"
+        lineWidths={['100%', '92%', '80%', '60%']}
+      />
+      <ChatBubbleSkeleton align="right" lineWidths={['7rem']} />
+      <ChatBubbleSkeleton
+        align="left"
+        lineWidths={['96%', '88%', '70%']}
+      />
     </div>
   );
 }

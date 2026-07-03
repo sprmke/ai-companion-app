@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { aiModelOptions } from '@/services/AiModelOptions';
+import { aiModelOptions, resolveAiModelId } from '@/services/AiModelOptions';
 import { useUpgradeCheckout } from '@/hooks/use-upgrade-checkout';
 import { cn } from '@/lib/utils';
 
@@ -28,8 +28,10 @@ export function ModelSelector({
   className,
 }: ModelSelectorProps) {
   const { isPro } = useUpgradeCheckout();
+  const resolvedValue = resolveAiModelId(value);
   const selectedModel =
-    aiModelOptions.find((model) => model.id === value) ?? aiModelOptions[0];
+    aiModelOptions.find((model) => model.id === resolvedValue) ??
+    aiModelOptions[0];
 
   if (!isPro) {
     return (
@@ -37,7 +39,7 @@ export function ModelSelector({
         type="button"
         onClick={onUpgradeClick}
         className={cn(
-          'flex h-11 w-full items-center justify-between rounded-2xl border border-border/50 bg-muted/40 px-4 py-2 text-sm shadow-sm transition-all hover:border-primary/30 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
+          'flex h-11 w-full items-center justify-between rounded-2xl border border-border/50 bg-muted/40 px-3.5 py-2 text-sm shadow-sm transition-all hover:border-primary/30 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
           className
         )}
         aria-label="Upgrade to change AI model"
@@ -58,8 +60,13 @@ export function ModelSelector({
   }
 
   return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={cn('w-full', className)}>
+    <Select value={resolvedValue} onValueChange={onValueChange}>
+      <SelectTrigger
+        className={cn(
+          'w-full rounded-2xl px-3.5 text-sm',
+          className
+        )}
+      >
         <SelectValue placeholder="Select Model" />
       </SelectTrigger>
       <SelectContent>

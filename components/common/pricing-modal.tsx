@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  type DialogLayer,
 } from '@/components/ui/dialog';
 import { useUpgradeCheckout } from '@/hooks/use-upgrade-checkout';
 
@@ -25,6 +26,8 @@ type PricingModalProps = {
   onOpenChange: (open: boolean) => void;
   title?: string;
   description?: string;
+  /** Renders above other open dialogs (e.g. Edit companion). */
+  layer?: DialogLayer;
 };
 
 export function PricingModal({
@@ -32,12 +35,13 @@ export function PricingModal({
   onOpenChange,
   title = 'Upgrade to Pro',
   description = 'Model selection and priority access are included with Pro. Upgrade to choose different AI providers for each companion.',
+  layer = 'elevated',
 }: PricingModalProps) {
   const { isPro, isLoading, startCheckout } = useUpgradeCheckout();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-3xl">
+      <DialogContent layer={layer} className="max-w-md rounded-3xl">
         <DialogHeader className="space-y-1.5">
           <DialogTitle className="text-xl">{title}</DialogTitle>
           <DialogDescription className="text-sm leading-snug">
