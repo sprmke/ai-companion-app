@@ -50,7 +50,8 @@ const chatPreviewMessages = [
   },
   {
     role: 'user' as const,
-    content: 'Can you also show how to type an API response that returns this profile?',
+    content:
+      'Can you also show how to type an API response that returns this profile?',
   },
   {
     role: 'assistant' as const,
@@ -101,16 +102,14 @@ export function WorkspacePreview({ glow = true }: { glow?: boolean }) {
             <Sparkles className="h-6 w-6 text-primary" />
             <p className="text-sm font-bold">How can I assist you?</p>
             <div className="mt-2.5 w-full max-w-[260px] space-y-1.5">
-              {workspaceActiveCompanion.sampleQuestions
-                .slice(0, 2)
-                .map((q) => (
-                  <div
-                    key={q}
-                    className="rounded-xl border border-border/40 bg-muted/15 px-2.5 py-2 text-left text-[10px] leading-snug text-muted-foreground dark:bg-background/70"
-                  >
-                    {q}
-                  </div>
-                ))}
+              {workspaceActiveCompanion.sampleQuestions.slice(0, 2).map((q) => (
+                <div
+                  key={q}
+                  className="rounded-xl border border-border/40 bg-muted/15 px-2.5 py-2 text-left text-[10px] leading-snug text-muted-foreground dark:bg-background/70"
+                >
+                  {q}
+                </div>
+              ))}
             </div>
           </div>
           <div className="mt-4 flex gap-2.5">
@@ -123,9 +122,6 @@ export function WorkspacePreview({ glow = true }: { glow?: boolean }) {
 
         <div className="col-span-1 flex flex-col border-l border-border/40 bg-muted/20 p-3">
           <div className="rounded-xl border border-border/40 bg-muted/40 p-2.5">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-primary/80">
-              Active Companion
-            </p>
             <div className="mt-2 flex gap-2">
               <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg ring-1 ring-primary/20">
                 <Image
