@@ -459,6 +459,15 @@
     }
   }
 
+  @keyframes thinking-shimmer {
+    0% {
+      background-position: 200% 50%;
+    }
+    100% {
+      background-position: -200% 50%;
+    }
+  }
+
   @keyframes landing-pulse {
     0%,
     100% {
@@ -593,4 +602,17 @@ checkbox[data-state='checked'] {
 
 [data-sonner-toast] [data-content] {
   padding-right: 0.25rem;
+}
+
+/* Tiptap rich text editor */
+.rich-text-editor .tiptap {
+  outline: none;
+}
+
+.rich-text-editor .tiptap p.is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }
