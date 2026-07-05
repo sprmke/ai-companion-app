@@ -9,8 +9,10 @@ import { LoadingScreen, getRouteLoadingVariant } from '@/components/common/loadi
 
 import { AuthContext } from '@/context/AuthContext';
 import { AssistantContext } from '@/context/AssistantContext';
+import { ThreadContext } from '@/context/ThreadContext';
 
 import type { AiAssistant } from '@/app/(main)/types';
+import { Id } from '@/convex/_generated/dataModel';
 
 const PUBLIC_PATHS = ['/'];
 
@@ -25,6 +27,23 @@ function Provider({
   const [assistant, setAssistant] = useState<AiAssistant | null>(null);
   const [isWorkspaceLoading, setWorkspaceLoading] = useState(false);
   const [assistantsRefreshKey, setAssistantsRefreshKey] = useState(0);
+  const [currentThreadId, setCurrentThreadId] =
+    useState<Id<'chatThreads'> | null>(null);
+  const [isThreadSheetOpen, setIsThreadSheetOpen] = useState(false);
+  const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(
+    null
+  );
+
+  const startNewChatWithMessage = (message: string) => {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    setCurrentThreadId(null);
+    setPendingChatMessage(trimmed);
+  };
+
+  const clearPendingChatMessage = () => {
+    setPendingChatMessage(null);
+  };
 
   const requestAssistantsRefresh = () => {
     setAssistantsRefreshKey((key) => key + 1);
@@ -59,8 +78,20 @@ function Provider({
         requestAssistantsRefresh,
       }}
     >
-      {showAppHeader && <Header />}
-      {children}
+      <ThreadContext.Provider
+        value={{
+          currentThreadId,
+          setCurrentThreadId,
+          isThreadSheetOpen,
+          setIsThreadSheetOpen,
+          pendingChatMessage,
+          startNewChatWithMessage,
+          clearPendingChatMessage,
+        }}
+      >
+        {showAppHeader && <Header />}
+        {children}
+      </ThreadContext.Provider>
     </AssistantContext.Provider>
   );
 }
