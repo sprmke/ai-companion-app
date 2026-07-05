@@ -25,4 +25,5 @@ export type User = {
   _creationTime: number;
   orderId?: string;
   stripeCustomerId?: string;
+  topupCredits?: number;
 };
