@@ -15,6 +15,7 @@ import { AuthContext } from '@/context/AuthContext';
 import { AssistantContext } from '@/context/AssistantContext';
 
 import { aiAssistantsList } from '@/services/AiAssistantsList';
+import { DEFAULT_AI_MODEL_ID } from '@/services/AiModelOptions';
 import { AiAssistant, AiAssistants } from '@/app/(main)/types';
 import { cn } from '@/lib/utils';
 import { CompanionImage } from '@/components/common/companion-image';
@@ -110,7 +111,7 @@ function AIAssistants() {
         aiAssistants: selectedAssistants.map((assistant) => ({
           ...assistant,
           userId: user._id,
-          aiModelId: 'google/gemini-2.0-flash',
+          aiModelId: DEFAULT_AI_MODEL_ID,
         })),
       });
 
