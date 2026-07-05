@@ -84,22 +84,51 @@ export async function POST(req: NextRequest) {
           }
 
           if (user) {
-            console.log('Updating user credits:', {
-              userId: user._id,
-              currentCredits: user.credits,
-              newCredits: user.credits + PRO_PLAN_CREDITS,
-              subscription: session.subscription,
-            });
-
-            await convex.mutation(api.users.UpdateUserTokens, {
-              userId: user._id,
-              credits: user.credits + PRO_PLAN_CREDITS,
-              orderId: session.subscription as string,
-            });
-
-            console.log(
-              `Updated credits for user ${user.email} after successful payment`
+            const isTokenTopUp =
+              session.mode === 'payment' &&
+              session.metadata?.type === 'token_topup';
+            const topupAmount = Number.parseInt(
+              session.metadata?.tokenAmount ?? '0',
+              10
             );
+
+            if (isTokenTopUp && topupAmount > 0) {
+              console.log('Adding top-up tokens:', {
+                userId: user._id,
+                currentCredits: user.credits,
+                topupAmount,
+              });
+
+              await convex.mutation(api.users.ApplyTokenTopup, {
+                userId: user._id,
+                sessionId: session.id,
+                amount: topupAmount,
+              });
+
+              console.log(
+                `Added ${topupAmount} top-up tokens for user ${user.email}`
+              );
+            } else if (session.subscription) {
+              console.log('Updating user credits:', {
+                userId: user._id,
+                currentCredits: user.credits,
+                newCredits: PRO_PLAN_CREDITS,
+                subscription: session.subscription,
+              });
+
+              // Set (not add) the Pro allowance. The first payment fires both
+              // `checkout.session.completed` and `invoice.payment_succeeded`, so
+              // setting keeps the grant idempotent and the usage meter accurate.
+              await convex.mutation(api.users.UpdateUserTokens, {
+                userId: user._id,
+                credits: PRO_PLAN_CREDITS,
+                orderId: session.subscription as string,
+              });
+
+              console.log(
+                `Updated credits for user ${user.email} after successful payment`
+              );
+            }
           } else {
             console.error('No user found for customer:', customerId);
           }
@@ -151,13 +180,14 @@ export async function POST(req: NextRequest) {
             console.log('Updating user credits (invoice):', {
               userId: user._id,
               currentCredits: user.credits,
-              newCredits: user.credits + PRO_PLAN_CREDITS,
+              newCredits: PRO_PLAN_CREDITS,
               subscription: invoice.subscription,
             });
 
+            // Each billing cycle resets the balance to the monthly Pro allowance.
             await convex.mutation(api.users.UpdateUserTokens, {
               userId: user._id,
-              credits: user.credits + PRO_PLAN_CREDITS,
+              credits: PRO_PLAN_CREDITS,
               orderId: invoice.subscription as string,
             });
 
